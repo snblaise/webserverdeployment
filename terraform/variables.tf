@@ -46,9 +46,9 @@ variable "az_count" {
 }
 
 variable "allowed_http_cidrs" {
-  description = "CIDR blocks allowed to access ALB on HTTP"
+  description = "CIDR blocks allowed to access ALB on HTTP/HTTPS - restrict to specific IPs/ranges for security"
   type        = list(string)
-  default     = ["0.0.0.0/0"] # Default for development - should be restricted in production
+  default     = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"] # Private networks only by default
   validation {
     condition = alltrue([
       for cidr in var.allowed_http_cidrs : can(cidrhost(cidr, 0))
@@ -314,5 +314,24 @@ variable "create_instances" {
   description = "Create EC2 instances"
   type        = bool
   default     = true
+}
+
+# ALB Security Configuration
+variable "enable_alb_access_logs" {
+  description = "Enable ALB access logging"
+  type        = bool
+  default     = true
+}
+
+variable "alb_access_logs_bucket" {
+  description = "S3 bucket for ALB access logs (optional - will create if not provided)"
+  type        = string
+  default     = ""
+}
+
+variable "ssl_certificate_arn" {
+  description = "ARN of SSL certificate for HTTPS listener (required for HTTPS)"
+  type        = string
+  default     = ""
 }
 

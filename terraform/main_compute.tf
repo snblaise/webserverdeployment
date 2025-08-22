@@ -18,6 +18,112 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
+# Data source for current AWS account ID
+data "aws_caller_identity" "current" {}
+
+# ========================================
+# S3 Bucket for ALB Access Logs
+# ========================================
+
+# S3 bucket for ALB access logs
+resource "aws_s3_bucket" "alb_access_logs" {
+  count = var.create_alb && var.enable_alb_access_logs && var.alb_access_logs_bucket == "" ? 1 : 0
+
+  bucket        = "${var.project_name}-${var.env}-alb-access-logs-${random_id.bucket_suffix[0].hex}"
+  force_destroy = var.env != "prod"
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.env}-alb-access-logs"
+  })
+}
+
+# Random ID for bucket suffix to ensure uniqueness
+resource "random_id" "bucket_suffix" {
+  count = var.create_alb && var.enable_alb_access_logs && var.alb_access_logs_bucket == "" ? 1 : 0
+
+  byte_length = 4
+}
+
+# S3 bucket versioning
+resource "aws_s3_bucket_versioning" "alb_access_logs" {
+  count = var.create_alb && var.enable_alb_access_logs && var.alb_access_logs_bucket == "" ? 1 : 0
+
+  bucket = aws_s3_bucket.alb_access_logs[0].id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# S3 bucket encryption
+resource "aws_s3_bucket_server_side_encryption_configuration" "alb_access_logs" {
+  count = var.create_alb && var.enable_alb_access_logs && var.alb_access_logs_bucket == "" ? 1 : 0
+
+  bucket = aws_s3_bucket.alb_access_logs[0].id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+# S3 bucket public access block
+resource "aws_s3_bucket_public_access_block" "alb_access_logs" {
+  count = var.create_alb && var.enable_alb_access_logs && var.alb_access_logs_bucket == "" ? 1 : 0
+
+  bucket = aws_s3_bucket.alb_access_logs[0].id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# S3 bucket policy for ALB access logs
+resource "aws_s3_bucket_policy" "alb_access_logs" {
+  count = var.create_alb && var.enable_alb_access_logs && var.alb_access_logs_bucket == "" ? 1 : 0
+
+  bucket = aws_s3_bucket.alb_access_logs[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_elb_service_account.main.id}:root"
+        }
+        Action   = "s3:PutObject"
+        Resource = "${aws_s3_bucket.alb_access_logs[0].arn}/${var.project_name}-${var.env}-alb/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
+      },
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "delivery.logs.amazonaws.com"
+        }
+        Action   = "s3:PutObject"
+        Resource = "${aws_s3_bucket.alb_access_logs[0].arn}/${var.project_name}-${var.env}-alb/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
+        Condition = {
+          StringEquals = {
+            "s3:x-amz-acl" = "bucket-owner-full-control"
+          }
+        }
+      },
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "delivery.logs.amazonaws.com"
+        }
+        Action   = "s3:GetBucketAcl"
+        Resource = aws_s3_bucket.alb_access_logs[0].arn
+      }
+    ]
+  })
+}
+
+# Data source for ELB service account
+data "aws_elb_service_account" "main" {}
+
 # ========================================
 # Application Load Balancer
 # ========================================
@@ -33,6 +139,14 @@ resource "aws_lb" "main" {
   subnets            = var.create_vpc ? aws_subnet.public[*].id : data.aws_subnets.existing[0].ids
 
   enable_deletion_protection = var.env == "prod" ? true : false
+  drop_invalid_header_fields = true
+
+  # Access logging configuration
+  access_logs {
+    bucket  = var.alb_access_logs_bucket != "" ? var.alb_access_logs_bucket : (var.enable_alb_access_logs ? aws_s3_bucket.alb_access_logs[0].bucket : "")
+    prefix  = "${var.project_name}-${var.env}-alb"
+    enabled = var.enable_alb_access_logs
+  }
 
   tags = merge(local.common_tags, {
     Name = "${var.project_name}-${var.env}-alb"
@@ -65,8 +179,8 @@ resource "aws_lb_target_group" "main" {
   })
 }
 
-# ALB Listener for HTTP traffic
-resource "aws_lb_listener" "main" {
+# ALB Listener for HTTP traffic (redirects to HTTPS)
+resource "aws_lb_listener" "http" {
   count = var.create_alb ? 1 : 0
 
   load_balancer_arn = aws_lb.main[0].arn
@@ -74,12 +188,37 @@ resource "aws_lb_listener" "main" {
   protocol          = "HTTP"
 
   default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.env}-alb-http-listener"
+  })
+}
+
+# ALB Listener for HTTPS traffic
+resource "aws_lb_listener" "https" {
+  count = var.create_alb && var.ssl_certificate_arn != "" ? 1 : 0
+
+  load_balancer_arn = aws_lb.main[0].arn
+  port              = "443"
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
+  certificate_arn   = var.ssl_certificate_arn
+
+  default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.main[0].arn
   }
 
   tags = merge(local.common_tags, {
-    Name = "${var.project_name}-${var.env}-alb-listener"
+    Name = "${var.project_name}-${var.env}-alb-https-listener"
   })
 }
 
@@ -114,6 +253,7 @@ resource "aws_instance" "main" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   user_data              = local.user_data
   monitoring             = var.enable_detailed_monitoring
+  ebs_optimized          = true
 
   # Security hardening - require IMDSv2
   metadata_options {

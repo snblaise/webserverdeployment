@@ -89,20 +89,30 @@ resource "aws_iam_role_policy_attachment" "ec2_cloudwatch_custom" {
 # Security group for Application Load Balancer
 resource "aws_security_group" "alb" {
   name_prefix = "${var.project_name}-${var.env}-alb-"
+  description = "Security group for Application Load Balancer - allows HTTP/HTTPS traffic from specified CIDRs"
   vpc_id      = var.create_vpc ? aws_vpc.main[0].id : data.aws_vpc.existing[0].id
 
-  # HTTP access from allowed CIDRs
+  # HTTP access from allowed CIDRs (restricted, not 0.0.0.0/0)
   ingress {
-    description = "HTTP"
+    description = "HTTP access from allowed CIDRs only"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = var.allowed_http_cidrs
   }
 
+  # HTTPS access from allowed CIDRs
+  ingress {
+    description = "HTTPS access from allowed CIDRs only"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_http_cidrs
+  }
+
   # All outbound traffic
   egress {
-    description = "All outbound traffic"
+    description = "All outbound traffic to internet"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -121,29 +131,30 @@ resource "aws_security_group" "alb" {
 # Security group for EC2 instances
 resource "aws_security_group" "ec2" {
   name_prefix = "${var.project_name}-${var.env}-ec2-"
+  description = "Security group for EC2 instances - allows traffic from ALB and VPC endpoints"
   vpc_id      = var.create_vpc ? aws_vpc.main[0].id : data.aws_vpc.existing[0].id
 
-  # HTTP access from ALB security group
+  # HTTP access from ALB security group only
   ingress {
-    description     = "HTTP from ALB"
+    description     = "HTTP traffic from Application Load Balancer only"
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
 
-  # HTTPS access for VPC endpoints
+  # HTTPS access for VPC endpoints communication
   ingress {
-    description = "HTTPS for VPC endpoints"
+    description = "HTTPS for VPC endpoints and AWS services communication"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = [var.cidr_block]
   }
 
-  # All outbound traffic
+  # All outbound traffic for updates and AWS services
   egress {
-    description = "All outbound traffic"
+    description = "All outbound traffic for updates and AWS services"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"

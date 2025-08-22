@@ -42,7 +42,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main[0].id
   cidr_block              = cidrsubnet(var.cidr_block, 8, count.index)
   availability_zone       = data.aws_availability_zones.available.names[count.index]
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = false  # Security best practice - don't auto-assign public IPs
 
   tags = merge(local.common_tags, {
     Name = "${var.project_name}-${var.env}-public-subnet-${count.index + 1}"
@@ -209,10 +209,11 @@ resource "aws_security_group" "vpc_endpoints" {
   count = var.create_vpc ? 1 : 0
 
   name_prefix = "${var.project_name}-${var.env}-vpc-endpoints-"
+  description = "Security group for VPC endpoints - allows HTTPS traffic from VPC CIDR"
   vpc_id      = aws_vpc.main[0].id
 
   ingress {
-    description = "HTTPS from VPC"
+    description = "HTTPS traffic from VPC CIDR for AWS service communication"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
@@ -220,7 +221,7 @@ resource "aws_security_group" "vpc_endpoints" {
   }
 
   egress {
-    description = "All outbound traffic"
+    description = "All outbound traffic for AWS service responses"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
