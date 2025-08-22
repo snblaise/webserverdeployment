@@ -32,7 +32,7 @@ name: Infrastructure CI/CD Pipeline
 # Required permissions for OIDC authentication
 permissions:
   id-token: write # Required for OIDC authentication
-  contents: read # Required to checkout code
+  contents: write # Required to checkout code and create commit comments
   pull-requests: write # Required to comment on PRs
   actions: read # Required to read workflow artifacts
   issues: write # Required to create deployment tracking issues
