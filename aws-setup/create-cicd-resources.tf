@@ -23,7 +23,7 @@ variable "project_name" {
   description = "Project name"
   type        = string
   default     = "webserverdeployment"
-  
+
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.project_name))
     error_message = "Project name must contain only lowercase letters, numbers, and hyphens."
@@ -34,7 +34,7 @@ variable "github_repository" {
   description = "GitHub repository in format 'owner/repo'"
   type        = string
   default     = "snblaise/webserverdeployment"
-  
+
   validation {
     condition     = can(regex("^[^/]+/[^/]+$", var.github_repository))
     error_message = "GitHub repository must be in format 'owner/repo'."
@@ -77,9 +77,9 @@ resource "aws_s3_bucket_public_access_block" "terraform_state" {
 
 # DynamoDB table for state locking
 resource "aws_dynamodb_table" "terraform_state_lock" {
-  name           = "${var.project_name}-terraform-state-lock"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "LockID"
+  name         = "${var.project_name}-terraform-state-lock"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "LockID"
 
   attribute {
     name = "LockID"
@@ -173,18 +173,18 @@ resource "aws_iam_role_policy" "github_actions" {
         Resource = "*"
       },
       {
-        Effect = "Allow"
-        Action = ["s3:ListBucket"]
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
         Resource = aws_s3_bucket.terraform_state.arn
       },
       {
-        Effect = "Allow"
-        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
         Resource = "${aws_s3_bucket.terraform_state.arn}/*"
       },
       {
-        Effect = "Allow"
-        Action = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem"]
+        Effect   = "Allow"
+        Action   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem"]
         Resource = aws_dynamodb_table.terraform_state_lock.arn
       }
     ]
@@ -209,7 +209,7 @@ output "github_actions_role_arn" {
 
 output "setup_commands" {
   description = "Commands to set up GitHub secrets"
-  value = <<-EOT
+  value       = <<-EOT
     # Set these as GitHub repository secrets:
     AWS_ROLE_TO_ASSUME: ${aws_iam_role.github_actions.arn}
     TF_STATE_BUCKET: ${aws_s3_bucket.terraform_state.bucket}

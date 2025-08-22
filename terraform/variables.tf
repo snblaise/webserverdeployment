@@ -195,7 +195,7 @@ variable "monthly_budget_limit" {
   description = "Monthly budget limit in USD for cost monitoring"
   type        = number
   default     = 100
-  
+
   validation {
     condition     = var.monthly_budget_limit > 0
     error_message = "Monthly budget limit must be greater than 0."
@@ -206,7 +206,7 @@ variable "budget_alert_emails" {
   description = "List of email addresses to receive budget alerts"
   type        = list(string)
   default     = ["shublaisengwa@gmail.com"]
-  
+
   validation {
     condition = alltrue([
       for email in var.budget_alert_emails : can(regex("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", email))
@@ -231,7 +231,7 @@ variable "cloudwatch_billing_threshold" {
   description = "CloudWatch billing alarm threshold in USD"
   type        = number
   default     = 80
-  
+
   validation {
     condition     = var.cloudwatch_billing_threshold > 0
     error_message = "CloudWatch billing threshold must be greater than 0."
@@ -248,7 +248,7 @@ variable "cost_anomaly_threshold" {
   description = "Cost anomaly detection threshold in USD"
   type        = number
   default     = 20
-  
+
   validation {
     condition     = var.cost_anomaly_threshold > 0
     error_message = "Cost anomaly threshold must be greater than 0."

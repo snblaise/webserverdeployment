@@ -25,7 +25,7 @@ data "aws_ami" "amazon_linux" {
 # Application Load Balancer
 resource "aws_lb" "main" {
   count = var.create_alb ? 1 : 0
-  
+
   name               = "${var.project_name}-${var.env}-alb"
   internal           = false
   load_balancer_type = "application"
@@ -42,7 +42,7 @@ resource "aws_lb" "main" {
 # Target Group for EC2 instances
 resource "aws_lb_target_group" "main" {
   count = var.create_alb ? 1 : 0
-  
+
   name     = "${var.project_name}-${var.env}-tg"
   port     = 80
   protocol = "HTTP"
@@ -68,7 +68,7 @@ resource "aws_lb_target_group" "main" {
 # ALB Listener for HTTP traffic
 resource "aws_lb_listener" "main" {
   count = var.create_alb ? 1 : 0
-  
+
   load_balancer_arn = aws_lb.main[0].arn
   port              = "80"
   protocol          = "HTTP"
@@ -86,7 +86,7 @@ resource "aws_lb_listener" "main" {
 # Associate WAF Web ACL with ALB
 resource "aws_wafv2_web_acl_association" "main" {
   count = var.create_alb && var.create_waf ? 1 : 0
-  
+
   resource_arn = aws_lb.main[0].arn
   web_acl_arn  = aws_wafv2_web_acl.main[0].arn
 }

@@ -147,8 +147,8 @@ output "application_health_check_url" {
 output "deployment_summary" {
   description = "Summary of deployed resources for CI/CD reporting"
   value = {
-    project_name     = var.project_name
-    environment      = var.env
+    project_name    = var.project_name
+    environment     = var.env
     region          = var.aws_region
     vpc_id          = local.vpc_id
     alb_dns_name    = local.alb_dns

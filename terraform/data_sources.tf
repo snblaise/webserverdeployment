@@ -5,7 +5,7 @@
 # Existing VPC (when create_vpc = false)
 data "aws_vpc" "existing" {
   count = var.create_vpc ? 0 : 1
-  
+
   filter {
     name   = "tag:Name"
     values = ["${var.project_name}-${var.env}-vpc"]
@@ -15,12 +15,12 @@ data "aws_vpc" "existing" {
 # Existing public subnets (when create_vpc = false)
 data "aws_subnets" "existing" {
   count = var.create_vpc ? 0 : 1
-  
+
   filter {
     name   = "vpc-id"
     values = [data.aws_vpc.existing[0].id]
   }
-  
+
   filter {
     name   = "tag:Type"
     values = ["Public"]
@@ -30,12 +30,12 @@ data "aws_subnets" "existing" {
 # Existing private subnets (when create_vpc = false)
 data "aws_subnets" "existing_private" {
   count = var.create_vpc ? 0 : 1
-  
+
   filter {
     name   = "vpc-id"
     values = [data.aws_vpc.existing[0].id]
   }
-  
+
   filter {
     name   = "tag:Type"
     values = ["Private"]
@@ -64,7 +64,7 @@ data "aws_wafv2_web_acl" "existing" {
 # Existing SSM Patch Baseline (when create_patch_baseline = false)
 data "aws_ssm_patch_baseline" "existing" {
   count = var.create_patch_baseline ? 0 : 1
-  
+
   owner            = "Self"
   name_prefix      = "${var.project_name}-${var.env}"
   operating_system = "AMAZON_LINUX_2023"

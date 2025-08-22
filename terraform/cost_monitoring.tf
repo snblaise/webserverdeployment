@@ -11,11 +11,11 @@ data "aws_region" "current" {}
 resource "aws_budgets_budget" "monthly_cost_budget" {
   count = var.enable_cost_monitoring ? 1 : 0
 
-  name         = "${var.project_name}-${var.env}-monthly-budget"
-  budget_type  = "COST"
-  limit_amount = var.monthly_budget_limit
-  limit_unit   = "USD"
-  time_unit    = "MONTHLY"
+  name              = "${var.project_name}-${var.env}-monthly-budget"
+  budget_type       = "COST"
+  limit_amount      = var.monthly_budget_limit
+  limit_unit        = "USD"
+  time_unit         = "MONTHLY"
   time_period_start = formatdate("YYYY-MM-01_00:00", plantimestamp())
 
   cost_filter {
@@ -26,17 +26,17 @@ resource "aws_budgets_budget" "monthly_cost_budget" {
   # Alert when 80% of budget is reached
   notification {
     comparison_operator        = "GREATER_THAN"
-    threshold                 = 80
-    threshold_type            = "PERCENTAGE"
-    notification_type         = "ACTUAL"
+    threshold                  = 80
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
     subscriber_email_addresses = var.budget_alert_emails
   }
 
   # Alert when 100% of budget is reached
   notification {
     comparison_operator        = "GREATER_THAN"
-    threshold                 = 100
-    threshold_type            = "PERCENTAGE"
+    threshold                  = 100
+    threshold_type             = "PERCENTAGE"
     notification_type          = "ACTUAL"
     subscriber_email_addresses = var.budget_alert_emails
   }
@@ -44,8 +44,8 @@ resource "aws_budgets_budget" "monthly_cost_budget" {
   # Forecast alert when projected to exceed 120% of budget
   notification {
     comparison_operator        = "GREATER_THAN"
-    threshold                 = 120
-    threshold_type            = "PERCENTAGE"
+    threshold                  = 120
+    threshold_type             = "PERCENTAGE"
     notification_type          = "FORECASTED"
     subscriber_email_addresses = var.budget_alert_emails
   }
