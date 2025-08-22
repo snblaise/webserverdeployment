@@ -52,8 +52,9 @@ additional_tags = {
   "Monitoring"      = "basic"
   "Purpose"         = "feature-branch-testing"
   "CostOptimized"   = "true"
-}# C
-ost Monitoring Configuration - Preview Environment
+}
+
+# Cost Monitoring Configuration - Preview Environment
 enable_cost_monitoring            = true
 monthly_budget_limit             = 15   # Very low budget for preview
 budget_alert_emails              = [
