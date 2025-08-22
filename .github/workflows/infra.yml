@@ -1094,7 +1094,16 @@ jobs:
             -var-file="environments/test.tfvars" \
             -out=test_plan.tfplan \
             -detailed-exitcode \
-            -no-color
+            -no-color || {
+            PLAN_EXIT_CODE=$?
+            if [ "$PLAN_EXIT_CODE" -eq "2" ]; then
+              echo "Changes detected - proceeding with apply"
+              exit 0
+            else
+              echo "Plan failed with exit code $PLAN_EXIT_CODE"
+              exit $PLAN_EXIT_CODE
+            fi
+          }
 
       - name: Terraform Apply
         id: apply
