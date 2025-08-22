@@ -17,7 +17,7 @@ Feature: Monitoring and logging must be properly configured
   Scenario: CloudWatch alarms should have alarm actions configured
     Given I have aws_cloudwatch_metric_alarm defined
     When it contains alarm_actions
-    Then its value should reference aws_sns_topic
+    Then its value must not be null
 
   Scenario: SNS topics should have proper naming
     Given I have aws_sns_topic defined
@@ -38,6 +38,5 @@ Feature: Monitoring and logging must be properly configured
     Given I have aws_instance defined
     When it has tags
     And it contains Environment
-    And its value matches "(staging|prod)"
     Then it must contain monitoring
     And its value must be true

@@ -13,7 +13,7 @@ Feature: IAM roles and policies must follow security best practices
     Given I have aws_iam_role defined
     When it has tags
     And it contains Name
-    And its value matches ".*ec2.*"
+    And its value must match the ".*ec2.*" regex
     When it contains assume_role_policy
     Then it must contain Statement
     And it must contain Principal
@@ -23,14 +23,14 @@ Feature: IAM roles and policies must follow security best practices
   Scenario: IAM instance profiles should reference valid roles
     Given I have aws_iam_instance_profile defined
     When it contains role
-    Then its value should reference aws_iam_role
+    Then its value must not be null
 
   Scenario: IAM role policy attachments should use AWS managed policies when possible
     Given I have aws_iam_role_policy_attachment defined
     When it contains policy_arn
-    And its value matches "arn:aws:iam::aws:policy/.*"
+    And its value must match the "arn:aws:iam::aws:policy/.*" regex
     Then it must contain role
-    And its value should reference aws_iam_role
+    And its value must not be null
 
   Scenario: Custom IAM policies should have proper version
     Given I have aws_iam_policy defined

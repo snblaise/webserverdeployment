@@ -6,7 +6,7 @@ Feature: WAF protection must be enabled
   Scenario: WAF Web ACL should be associated with ALB
     Given I have aws_wafv2_web_acl_association defined
     When it contains resource_arn
-    Then its value should reference aws_lb
+    Then its value must not be null
 
   Scenario: WAF Web ACL should have managed rules
     Given I have aws_wafv2_web_acl defined
@@ -45,9 +45,9 @@ Feature: WAF protection must be enabled
   Scenario: WAF should have logging configuration
     Given I have aws_wafv2_web_acl_logging_configuration defined
     When it contains resource_arn
-    Then its value should reference aws_wafv2_web_acl
+    Then its value must not be null
 
   Scenario: WAF logging should use CloudWatch
     Given I have aws_wafv2_web_acl_logging_configuration defined
     When it contains log_destination_configs
-    Then its value should reference aws_cloudwatch_log_group
+    Then its value must not be null

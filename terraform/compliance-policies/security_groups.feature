@@ -23,7 +23,7 @@ Feature: Security groups must follow least privilege
     Given I have aws_security_group defined
     When it has tags
     And it contains Name
-    And its value matches ".*ec2.*"
+    And its value must match the ".*ec2.*" regex
     When it contains ingress
     And it contains from_port
     And its value is 80
@@ -35,7 +35,7 @@ Feature: Security groups must follow least privilege
     Given I have aws_security_group defined
     When it has tags
     And it contains Name
-    And its value matches ".*ec2.*"
+    And its value must match the ".*ec2.*" regex
     When it contains ingress
     And it contains from_port
     And its value is 80
@@ -46,7 +46,7 @@ Feature: Security groups must follow least privilege
     Given I have aws_security_group defined
     When it has tags
     And it contains Name
-    And its value matches ".*alb.*"
+    And its value must match the ".*alb.*" regex
     When it contains ingress
     And it contains from_port
     And its value is 80
@@ -63,7 +63,7 @@ Feature: Security groups must follow least privilege
     Given I have aws_security_group defined
     When it has tags
     And it contains Name
-    And its value matches ".*vpc-endpoints.*"
+    And its value must match the ".*vpc-endpoints.*" regex
     When it contains ingress
     And it contains from_port
     And its value is 443

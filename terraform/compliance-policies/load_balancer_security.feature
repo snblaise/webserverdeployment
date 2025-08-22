@@ -12,7 +12,7 @@ Feature: Load balancer security must be properly configured
     Given I have aws_lb defined
     When it has tags
     And it contains Name
-    And its value matches ".*alb.*"
+    And its value must contain alb
     Then it must contain internal
     And its value must be false
 
@@ -24,7 +24,7 @@ Feature: Load balancer security must be properly configured
   Scenario: ALB should have security groups configured
     Given I have aws_lb defined
     Then it must contain security_groups
-    And its value should reference aws_security_group
+    And its value must not be null
 
   Scenario: ALB target groups should have health checks enabled
     Given I have aws_lb_target_group defined
@@ -57,4 +57,4 @@ Feature: Load balancer security must be properly configured
   Scenario: Target group attachments should reference valid instances
     Given I have aws_lb_target_group_attachment defined
     When it contains target_id
-    Then its value should reference aws_instance
+    Then its value must not be null

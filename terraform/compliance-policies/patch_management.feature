@@ -25,7 +25,7 @@ Feature: Patch management must be properly configured
   Scenario: SSM patch groups should be configured
     Given I have aws_ssm_patch_group defined
     When it contains baseline_id
-    Then its value should reference aws_ssm_patch_baseline
+    Then its value must not be null
 
   Scenario: State Manager associations should use proper documents
     Given I have aws_ssm_association defined

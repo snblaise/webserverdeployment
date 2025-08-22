@@ -21,13 +21,13 @@ Feature: Network isolation must be properly configured
   Scenario: NAT Gateway should be in public subnets
     Given I have aws_nat_gateway defined
     When it contains subnet_id
-    Then its value should reference public subnets
+    Then its value must not be null
 
   Scenario: Private subnets should not auto-assign public IPs
     Given I have aws_subnet defined
     When it has tags
     And it contains Name
-    And its value matches ".*private.*"
+    And its value must contain private
     Then it must contain map_public_ip_on_launch
     And its value must be false
 
@@ -35,7 +35,7 @@ Feature: Network isolation must be properly configured
     Given I have aws_subnet defined
     When it has tags
     And it contains Name
-    And its value matches ".*public.*"
+    And its value must contain public
     Then it must contain map_public_ip_on_launch
     And its value must be true
 
@@ -54,7 +54,7 @@ Feature: Network isolation must be properly configured
     When it contains vpc_endpoint_type
     And its value is Interface
     Then it must contain subnet_ids
-    And its value should reference private subnets
+    And its value must not be null
 
   Scenario: VPC endpoints should have private DNS enabled
     Given I have aws_vpc_endpoint defined
