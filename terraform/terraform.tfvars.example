@@ -1,0 +1,73 @@
+# ========================================
+# Example Terraform Variables Configuration
+# ========================================
+# 
+# This file provides example values for all Terraform variables.
+# For environment-specific configurations, use the files in the environments/ directory:
+# - environments/test.tfvars
+# - environments/staging.tfvars
+# - environments/prod.tfvars
+# - environments/preview.tfvars
+#
+# Usage:
+#   terraform plan -var-file="environments/staging.tfvars"
+#   terraform apply -var-file="environments/prod.tfvars"
+#
+
+# Project Configuration
+project_name = "secure-cicd-pipeline"
+env          = "staging"
+
+# AWS Configuration
+aws_region = "us-east-1"
+
+# Network Configuration
+cidr_block         = "10.1.0.0/16"  # Use different CIDRs per environment
+az_count           = 2
+allowed_http_cidrs = ["0.0.0.0/0"]
+
+# Compute Configuration
+instance_type  = "t3.small"  # Adjust per environment (t3.micro for test/preview)
+instance_count = 2           # Adjust per environment (1 for test/preview)
+
+# Security Configuration
+kms_key_id                 = null  # Use default AWS managed key
+enable_detailed_monitoring = true  # false for test/preview environments
+
+# Environment-specific Configuration
+enable_preview        = false  # true only for preview environments
+backup_retention_days = 14     # Varies per environment (7/14/30/1)
+
+# Monitoring Configuration
+sns_email_endpoints = [
+  "devops@example.com",
+  "admin@example.com"
+]
+cloudwatch_log_retention_days = 30  # Varies per environment (7/30/90/3)
+
+# WAF Configuration
+waf_rate_limit = 2000  # Adjust per environment needs
+
+# Patch Management Configuration
+patch_schedule = "cron(0 2 ? * SUN *)"  # Sundays at 2 AM UTC
+
+# Tagging Configuration
+cost_center = "devops"
+owner       = "DevOps Team"
+application = "Secure CI/CD Pipeline"
+additional_tags = {
+  "Repository" = "secure-cicd-pipeline"
+  "Team"       = "Platform Engineering"
+}# Cost M
+onitoring Configuration
+enable_cost_monitoring            = true
+monthly_budget_limit             = 100  # USD - adjust per environment
+budget_alert_emails              = [
+  "devops@example.com",
+  "finance@example.com"
+]
+enable_sns_cost_alerts           = false  # Use direct email alerts
+enable_cloudwatch_billing_alarms = true
+cloudwatch_billing_threshold     = 80    # USD - 80% of budget
+enable_cost_anomaly_detection    = false # Enable for production environments
+cost_anomaly_threshold           = 20    # USD - minimum anomaly amount to alert

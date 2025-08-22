@@ -1,0 +1,103 @@
+# Checkov configuration for secure CI/CD pipeline
+# This configuration defines security checks for our Terraform infrastructure
+
+# Framework to scan
+framework:
+  - terraform
+
+# Output format
+output:
+  - cli
+  - json
+
+# Quiet mode to reduce noise
+quiet: true
+
+# Compact output for better readability in CI
+compact: true
+
+# Skip certain checks that may not apply to our use case or are handled differently
+skip-check:
+  # S3 state bucket related checks (managed separately)
+  - CKV_AWS_144  # Ensure that S3 bucket has cross-region replication enabled (not needed for state bucket)
+  - CKV_AWS_18   # Ensure S3 bucket has access logging configured (not needed for state bucket)
+  - CKV_AWS_52   # Ensure S3 bucket has MFA delete enabled (not practical for automation)
+  
+  # ALB access logging (optional for demo/test environments)
+  - CKV_AWS_91   # Ensure the ELBv2 has access logging enabled (can be enabled per environment)
+  - CKV_AWS_92   # Ensure the ELBv2 has access logging enabled (can be enabled per environment)
+  
+  # VPC Flow Logs (optional for cost optimization in test environments)
+  - CKV_AWS_178  # Ensure that VPC has Flow Logs enabled (can be enabled per environment)
+  
+  # CloudWatch log encryption (can be enabled per environment based on compliance needs)
+  - CKV_AWS_158  # Ensure CloudWatch log group is encrypted by KMS (optional for test environments)
+  
+  # Load balancer deletion protection (not needed for preview/test environments)
+  - CKV_AWS_150  # Ensure that Load Balancer has deletion protection enabled (environment-specific)
+
+# Include specific security checks that align with our requirements
+check:
+  # IMDSv2 requirements (Requirement 3.1)
+  - CKV_AWS_79   # Ensure Instance Metadata Service Version 1 is not enabled
+  - CKV_AWS_135  # Ensure that EC2 is EBS optimized
+  
+  # EBS encryption requirements (Requirement 3.2)
+  - CKV_AWS_8    # Ensure that EBS volumes are encrypted
+  - CKV_AWS_3    # Ensure that EBS volumes are encrypted
+  - CKV_AWS_189  # Ensure EBS encryption by default is enabled
+  
+  # Security group requirements (Requirement 3.4, 3.5)
+  - CKV_AWS_23   # Ensure no security groups allow ingress from 0.0.0.0:0 to port 22
+  - CKV_AWS_24   # Ensure no security groups allow ingress from 0.0.0.0:0 to port 3389
+  - CKV_AWS_25   # Ensure no security groups allow ingress from 0.0.0.0:0 to port 3389
+  - CKV_AWS_260  # Ensure no security groups allow ingress from 0.0.0.0:0 to port 80
+  - CKV_AWS_277  # Ensure no security groups allow ingress from 0.0.0.0:0 to port 4505 (Salt)
+  - CKV_AWS_278  # Ensure no security groups allow ingress from 0.0.0.0:0 to port 4506 (Salt)
+  
+  # ALB security requirements (Requirement 2.1)
+  - CKV_AWS_91   # Ensure the ELBv2 (Application/Network) has access logging enabled
+  - CKV_AWS_92   # Ensure the ELBv2 (Application/Network) has access logging enabled
+  - CKV_AWS_103  # Ensure that load balancer is using TLS 1.2
+  - CKV_AWS_131  # Ensure that ALB drops HTTP headers
+  - CKV_AWS_150  # Ensure that Load Balancer has deletion protection enabled
+  
+  # VPC and network security (Requirement 1.1-1.5)
+  - CKV_AWS_88   # EC2 instance should not have public IP
+  - CKV_AWS_130  # Ensure VPC subnets do not assign public IP by default
+  - CKV_AWS_178  # Ensure that VPC has Flow Logs enabled
+  
+  # IAM and access control (Requirement 3.3)
+  - CKV_AWS_60   # Ensure IAM role allows only specific services or principals
+  - CKV_AWS_61   # Ensure IAM role allows only specific principals
+  - CKV_AWS_62   # Ensure no IAM policies documents allow "*" as a statement's actions
+  
+  # WAF requirements (Requirement 2.2, 2.3, 2.4)
+  - CKV_AWS_192  # Ensure WAF prevents message lookup in Log4j2
+  - CKV_AWS_193  # Ensure WAF prevents message lookup in Log4j2
+  
+  # CloudWatch and monitoring (Requirement 4.1-4.5)
+  - CKV_AWS_76   # Ensure that CloudWatch has a log metric filter and alarm for AWS Config configuration changes
+  - CKV_AWS_158  # Ensure CloudWatch log group is encrypted by KMS
+  
+  # SSM and patch management (Requirement 5.1-5.5)
+  - CKV_AWS_109  # Ensure IAM policies does not allow privilege escalation
+  - CKV_AWS_111  # Ensure IAM policies does not allow write access without constraints
+
+# Severity levels to report
+severity:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
+
+# Custom policies directory (if we add custom policies later)
+# external-checks-dir: ./custom-policies
+
+# Baseline file to compare against (for future use)
+# baseline: .checkov.baseline
+
+# Suppress specific findings by resource (if needed)
+# suppress:
+#   - id: CKV_AWS_79
+#     file_path: main_compute.tf
+#     resource: aws_instance.web
