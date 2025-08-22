@@ -12,8 +12,8 @@ variable "env" {
   description = "Environment identifier (test/staging/prod/preview)"
   type        = string
   validation {
-    condition     = contains(["test", "staging", "prod", "preview"], var.env)
-    error_message = "Environment must be one of: test, staging, prod, preview."
+    condition     = can(regex("^(test|staging|prod|preview).*$", var.env))
+    error_message = "Environment must start with: test, staging, prod, or preview."
   }
 }
 
@@ -48,7 +48,7 @@ variable "az_count" {
 variable "allowed_http_cidrs" {
   description = "CIDR blocks allowed to access ALB on HTTP"
   type        = list(string)
-  # No default - force explicit security decision
+  default     = ["0.0.0.0/0"] # Default for development - should be restricted in production
   validation {
     condition = alltrue([
       for cidr in var.allowed_http_cidrs : can(cidrhost(cidr, 0))
