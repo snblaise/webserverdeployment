@@ -132,7 +132,7 @@ resource "aws_lb" "main" {
   security_groups    = [aws_security_group.alb.id]
   subnets            = var.create_vpc ? aws_subnet.public[*].id : data.aws_subnets.existing[0].ids
 
-  enable_deletion_protection = var.env == "prod" ? true : false
+  enable_deletion_protection = var.enable_alb_deletion_protection
   drop_invalid_header_fields = true
 
   # Access logging configuration

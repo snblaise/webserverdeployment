@@ -13,6 +13,9 @@ enable_detailed_monitoring = true
 
 # Security Configuration - RESTRICT ACCESS
 # allowed_http_cidrs = []  # Define specific IP ranges for production
+enable_alb_deletion_protection = true # Always enabled for production
+enable_alb_access_logs         = true
+# ssl_certificate_arn = ""  # Add SSL certificate ARN for production HTTPS
 
 # Monitoring Configuration
 enable_enhanced_monitoring = true

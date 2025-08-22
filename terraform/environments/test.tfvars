@@ -12,9 +12,10 @@ instance_count             = 1
 enable_detailed_monitoring = false
 
 # Security Configuration
-allowed_http_cidrs     = ["0.0.0.0/0"] # Open for testing - restrict in production
-enable_alb_access_logs = true
-ssl_certificate_arn    = "" # No SSL certificate for test environment
+allowed_http_cidrs             = ["0.0.0.0/0"] # Open for testing - restrict in production
+enable_alb_access_logs         = true
+ssl_certificate_arn            = "" # No SSL certificate for test environment
+enable_alb_deletion_protection = false # Disabled for test environment to allow easy cleanup
 
 # Monitoring Configuration
 enable_enhanced_monitoring = false

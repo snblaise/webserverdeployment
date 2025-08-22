@@ -335,3 +335,9 @@ variable "ssl_certificate_arn" {
   default     = ""
 }
 
+variable "enable_alb_deletion_protection" {
+  description = "Enable deletion protection for ALB (recommended for production)"
+  type        = bool
+  default     = true
+}
+
