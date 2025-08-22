@@ -89,7 +89,7 @@ resource "aws_iam_role_policy_attachment" "ec2_cloudwatch_custom" {
 # Security group for Application Load Balancer
 resource "aws_security_group" "alb" {
   name_prefix = "${var.project_name}-${var.env}-alb-"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = var.create_vpc ? aws_vpc.main[0].id : data.aws_vpc.existing[0].id
 
   # HTTP access from allowed CIDRs
   ingress {

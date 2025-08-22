@@ -4,22 +4,22 @@
 
 output "vpc_id" {
   description = "ID of the VPC"
-  value       = aws_vpc.main.id
+  value       = local.vpc_id
 }
 
 output "vpc_cidr_block" {
   description = "CIDR block of the VPC"
-  value       = aws_vpc.main.cidr_block
+  value       = local.vpc_cidr
 }
 
 output "public_subnet_ids" {
   description = "IDs of the public subnets"
-  value       = aws_subnet.public[*].id
+  value       = local.public_subnet_ids
 }
 
 output "private_subnet_ids" {
   description = "IDs of the private subnets"
-  value       = aws_subnet.private[*].id
+  value       = local.private_subnet_ids
 }
 
 # ========================================
@@ -28,17 +28,17 @@ output "private_subnet_ids" {
 
 output "alb_dns_name" {
   description = "DNS name of the load balancer"
-  value       = aws_lb.main.dns_name
+  value       = local.alb_dns
 }
 
 output "alb_zone_id" {
   description = "Zone ID of the load balancer"
-  value       = aws_lb.main.zone_id
+  value       = var.create_alb ? aws_lb.main[0].zone_id : data.aws_lb.existing[0].zone_id
 }
 
 output "alb_arn" {
   description = "ARN of the load balancer"
-  value       = aws_lb.main.arn
+  value       = local.alb_arn
 }
 
 # ========================================
@@ -71,7 +71,7 @@ output "ec2_security_group_id" {
 
 output "waf_web_acl_arn" {
   description = "ARN of the WAF Web ACL"
-  value       = aws_wafv2_web_acl.main.arn
+  value       = local.waf_web_acl_arn
 }
 
 # ========================================
@@ -94,12 +94,12 @@ output "cloudwatch_dashboard_url" {
 
 output "patch_baseline_id" {
   description = "ID of the SSM patch baseline"
-  value       = aws_ssm_patch_baseline.amazon_linux.id
+  value       = local.patch_baseline_id
 }
 
 output "patch_group_name" {
   description = "Name of the patch group"
-  value       = aws_ssm_patch_group.main.patch_group
+  value       = local.patch_group_name
 }
 
 output "patch_logs_bucket" {
@@ -132,12 +132,12 @@ output "aws_region" {
 
 output "application_url" {
   description = "URL to access the application"
-  value       = "http://${aws_lb.main.dns_name}"
+  value       = "http://${local.alb_dns}"
 }
 
 output "application_health_check_url" {
   description = "URL for application health checks"
-  value       = "http://${aws_lb.main.dns_name}/"
+  value       = "http://${local.alb_dns}/"
 }
 
 # ========================================
@@ -150,10 +150,10 @@ output "deployment_summary" {
     project_name     = var.project_name
     environment      = var.env
     region          = var.aws_region
-    vpc_id          = aws_vpc.main.id
-    alb_dns_name    = aws_lb.main.dns_name
-    instance_count  = var.instance_count
-    instance_ids    = aws_instance.main[*].id
+    vpc_id          = local.vpc_id
+    alb_dns_name    = local.alb_dns
+    instance_count  = var.create_instances ? var.instance_count : 0
+    instance_ids    = var.create_instances ? aws_instance.main[*].id : []
     deployment_time = timestamp()
   }
 }

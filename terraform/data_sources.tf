@@ -65,10 +65,7 @@ data "aws_wafv2_web_acl" "existing" {
 data "aws_ssm_patch_baseline" "existing" {
   count = var.create_patch_baseline ? 0 : 1
   
-  filter {
-    key    = "NAME_PREFIX"
-    values = ["${var.project_name}-${var.env}"]
-  }
-  
+  owner            = "Self"
+  name_prefix      = "${var.project_name}-${var.env}"
   operating_system = "AMAZON_LINUX_2023"
 }
