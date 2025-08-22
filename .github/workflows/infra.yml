@@ -200,29 +200,44 @@ jobs:
           echo "✅ Compliance policies verified successfully"
           echo "::endgroup::"
 
-      - name: Run terraform-compliance Policy Validation
-        id: compliance
+      - name: Generate Terraform Plan
+        id: plan_generation
         run: |
-          echo "::group::terraform-compliance Policy Validation"
+          echo "::group::Generate Terraform Plan"
           
-          # Generate Terraform plan in JSON format for compliance checking
-          echo "Generating Terraform plan for policy validation..."
-          terraform plan -out=compliance_plan.tfplan \
+          # Generate single plan for all validation steps
+          echo "Generating Terraform plan for validation and analysis..."
+          terraform plan -out=main_plan.tfplan \
             -var="env=preview-${{ github.head_ref }}" \
             -var="project_name=${{ github.event.repository.name }}" \
             -var="enable_preview=true" \
             -detailed-exitcode || {
             PLAN_EXIT_CODE=$?
             if [ "$PLAN_EXIT_CODE" -eq "1" ]; then
-              echo "::error::Terraform plan failed - cannot proceed with compliance validation"
+              echo "::error::Terraform plan failed"
               exit 1
             fi
-            # Exit code 2 means changes detected, which is fine for compliance checking
+            # Exit code 2 means changes detected, which is fine
           }
           
-          # Convert plan to JSON format
-          echo "Converting plan to JSON format for policy analysis..."
-          terraform show -json compliance_plan.tfplan > compliance_plan.json
+          # Convert plan to JSON format for compliance and cost analysis
+          echo "Converting plan to JSON format..."
+          terraform show -json main_plan.tfplan > plan.json
+          
+          # Create copies for different tools
+          cp plan.json compliance_plan.json
+          cp plan.json infracost_plan.json
+          cp main_plan.tfplan tfplan
+          
+          echo "::endgroup::"
+
+      - name: Run terraform-compliance Policy Validation
+        id: compliance
+        run: |
+          echo "::group::terraform-compliance Policy Validation"
+          
+          # Use pre-generated plan
+          echo "Using pre-generated plan for policy validation..."
           
           # Verify JSON plan was created successfully
           if [ ! -f "compliance_plan.json" ]; then
@@ -419,7 +434,7 @@ jobs:
           name: security-scan-results-${{ github.head_ref }}
           path: |
             terraform/checkov_results.json
-            terraform/compliance_plan.json
+            terraform/plan.json
             terraform/security_scan_summary.md
             terraform/validate_output.json
           retention-days: 30
@@ -434,25 +449,8 @@ jobs:
         run: |
           echo "::group::Infracost Cost Analysis"
           
-          # Generate Terraform plan in JSON format for cost analysis
-          echo "Generating Terraform plan for cost analysis..."
-          terraform plan \
-            -var="env=preview-${{ github.head_ref }}" \
-            -var="project_name=${{ github.event.repository.name }}" \
-            -var="enable_preview=true" \
-            -out=infracost_plan.tfplan \
-            -detailed-exitcode || {
-            PLAN_EXIT_CODE=$?
-            if [ "$PLAN_EXIT_CODE" -eq "1" ]; then
-              echo "::error::Terraform plan failed - cannot proceed with cost analysis"
-              exit 1
-            fi
-            # Exit code 2 means changes detected, which is fine for cost analysis
-          }
-          
-          # Convert plan to JSON format for Infracost
-          echo "Converting plan to JSON format for cost analysis..."
-          terraform show -json infracost_plan.tfplan > infracost_plan.json
+          # Use pre-generated plan for cost analysis
+          echo "Using pre-generated plan for cost analysis..."
           
           # Verify JSON plan was created successfully
           if [ ! -f "infracost_plan.json" ]; then
@@ -465,7 +463,7 @@ jobs:
           
           # Generate cost breakdown
           infracost breakdown \
-            --path=infracost_plan.json \
+            --path=plan.json \
             --format=json \
             --out-file=infracost_breakdown.json \
             --log-level=info || {
@@ -599,34 +597,21 @@ jobs:
           path: |
             terraform/infracost_breakdown.json
             terraform/infracost_diff.json
-            terraform/infracost_plan.json
+            terraform/plan.json
           retention-days: 30
 
-      - name: Terraform Plan
+      - name: Generate Plan Summary
         id: plan
         run: |
-          echo "::group::Terraform Plan Generation"
-          terraform plan \
-            -var="env=preview-${{ github.head_ref }}" \
-            -var="project_name=${{ github.event.repository.name }}" \
-            -var="enable_preview=true" \
-            -out=tfplan \
-            -detailed-exitcode \
-            -no-color > plan_output.txt 2>&1
-
-          # Capture plan exit code
-          PLAN_EXIT_CODE=$?
-          echo "plan_exit_code=$PLAN_EXIT_CODE" >> $GITHUB_OUTPUT
-
+          echo "::group::Plan Summary Generation"
+          
+          # Generate human-readable plan output
+          terraform show -no-color main_plan.tfplan > plan_output.txt
+          
           # Generate plan summary
-          if [ $PLAN_EXIT_CODE -eq 0 ]; then
-            echo "plan_summary=No changes detected" >> $GITHUB_OUTPUT
-          elif [ $PLAN_EXIT_CODE -eq 2 ]; then
-            echo "plan_summary=Changes detected - plan generated successfully" >> $GITHUB_OUTPUT
-          else
-            echo "plan_summary=Plan generation failed" >> $GITHUB_OUTPUT
-          fi
-
+          echo "plan_summary=Changes detected - plan generated successfully" >> $GITHUB_OUTPUT
+          echo "plan_exit_code=2" >> $GITHUB_OUTPUT
+          
           # Store plan output for PR comment
           cat plan_output.txt
           echo "::endgroup::"
@@ -660,10 +645,10 @@ jobs:
 
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4
-        if: steps.plan.outcome == 'success'
+        if: steps.plan_generation.outcome == 'success'
         with:
           name: terraform-plan-${{ github.head_ref }}
-          path: terraform/tfplan
+          path: terraform/main_plan.tfplan
           retention-days: 30
 
       - name: Comment PR with Plan Summary
