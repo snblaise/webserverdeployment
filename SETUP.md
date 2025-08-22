@@ -70,23 +70,30 @@ gh secret list
 # TF_STATE_LOCK_TABLE
 ```
 
-## Step 4: Test Pipeline
+## Step 4: Test Optimized Pipeline
 
-Create a test branch and PR to verify the pipeline works:
+Test the pipeline using the GitHub Actions interface:
 
 ```bash
-# Create test branch
-git checkout -b test-pipeline
+# Verify secrets are configured
+gh secret list
 
-# Make a small change
-echo "# Test" >> test.md
-git add test.md
-git commit -m "Test pipeline setup"
-git push -u origin test-pipeline
-
-# Create PR
-gh pr create --title "Test Pipeline" --body "Testing CI/CD pipeline setup"
+# Test the optimized workflow
+# 1. Go to GitHub Actions in your repository
+# 2. Select "Infrastructure CI/CD Pipeline (Optimized)"
+# 3. Click "Run workflow"
+# 4. Configure test deployment:
+#    - Environment: test
+#    - Force recreate: false
+#    - Skip tests: false
+#    - Dry run: true (for initial test)
 ```
+
+**Expected Results:**
+- ✅ Validation and security scanning complete
+- ✅ Cost analysis generated
+- ✅ Plan created with resource import detection
+- ✅ All safety checks passed
 
 ## Troubleshooting
 

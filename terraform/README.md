@@ -1,14 +1,16 @@
-# Secure CI/CD Pipeline Infrastructure
+# Secure CI/CD Pipeline Infrastructure - Terraform Configuration
 
-This Terraform configuration deploys a secure, scalable web application infrastructure on AWS with automated patch management.
+This Terraform configuration deploys a production-ready, secure web application infrastructure on AWS with comprehensive automation and monitoring.
 
 ## Architecture Overview
 
-- **VPC**: Multi-AZ VPC with public and private subnets
-- **Compute**: EC2 instances in private subnets behind an Application Load Balancer
-- **Security**: WAF, Security Groups, IAM roles with least privilege
-- **Monitoring**: CloudWatch alarms, dashboards, and SNS notifications
-- **Patch Management**: Automated SSM patch management with compliance monitoring
+- **🌐 VPC**: Multi-AZ VPC with public and private subnets
+- **🖥️ Compute**: Hardened EC2 instances in private subnets behind an Application Load Balancer
+- **🛡️ Security**: WAF, Security Groups, IAM roles with least privilege
+- **📊 Monitoring**: CloudWatch alarms, dashboards, and SNS notifications
+- **🔄 Patch Management**: Automated SSM patch management with compliance monitoring
+- **💰 Cost Control**: Resource tagging and cost monitoring
+- **🔒 Compliance**: Security scanning and policy validation
 
 ## Prerequisites
 
@@ -16,37 +18,55 @@ This Terraform configuration deploys a secure, scalable web application infrastr
 - AWS CLI configured with appropriate credentials
 - AWS account with necessary permissions
 
-## Quick Start
+## Deployment Methods
 
-### Environment-Specific Deployment
+### 🚀 Recommended: Use GitHub Actions (Optimized Pipeline)
 
-This infrastructure supports multiple environments with pre-configured settings:
+The optimized CI/CD pipeline provides enhanced safety and automation:
+
+1. **Go to GitHub Actions** in your repository
+2. **Select "Infrastructure CI/CD Pipeline (Optimized)"**
+3. **Configure deployment** with built-in safety features:
+   - Automatic resource import (prevents recreation errors)
+   - Comprehensive security scanning
+   - Cost analysis and budget monitoring
+   - Post-deployment validation
+
+### 🛠️ Local Development Deployment
+
+For local testing and development:
 
 1. **Initialize Terraform with backend configuration:**
    ```bash
-   terraform init -backend-config=backend.hcl
+   terraform init \
+     -backend-config="bucket=YOUR_TF_STATE_BUCKET" \
+     -backend-config="key=infrastructure/local/terraform.tfstate" \
+     -backend-config="region=us-east-1" \
+     -backend-config="dynamodb_table=YOUR_TF_STATE_LOCK_TABLE"
    ```
 
 2. **Deploy to a specific environment:**
    ```bash
-   # Test environment
+   # Test environment (cost-optimized)
    terraform plan -var-file="environments/test.tfvars"
    terraform apply -var-file="environments/test.tfvars"
    
-   # Staging environment
+   # Staging environment (production-like)
    terraform plan -var-file="environments/staging.tfvars"
    terraform apply -var-file="environments/staging.tfvars"
    
-   # Production environment
+   # Production environment (⚠️ Use GitHub Actions instead)
    terraform plan -var-file="environments/prod.tfvars"
    terraform apply -var-file="environments/prod.tfvars"
    ```
 
-3. **For custom configurations:**
+3. **Run local security scans:**
    ```bash
-   cp terraform.tfvars.example terraform.tfvars
-   vim terraform.tfvars
-   terraform plan -var-file="terraform.tfvars"
+   # Security scanning
+   ./scripts/security-scan.sh
+   
+   # Cost analysis (requires Infracost)
+   infracost breakdown --path . --format table
    ```
 
 ### Environment Configurations

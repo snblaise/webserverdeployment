@@ -1,6 +1,5 @@
 # Terraform
 .terraform/
-.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 *.tfvars
@@ -9,6 +8,10 @@ terraform.tfplan
 terraform.tfplan.*
 .terraformrc
 terraform.rc
+.terraform.tfstate.lock.info
+plan.json
+cost.json
+checkov_results.json
 
 # IDE
 .vscode/
@@ -26,3 +29,26 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Test results and artifacts
+test-results/
+backups/
+*.backup
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Node modules (if using any JS tools)
+node_modules/
+
+# Python (if using any Python tools)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
