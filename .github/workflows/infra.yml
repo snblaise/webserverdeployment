@@ -63,6 +63,14 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      - name: Check Required Secrets
+        run: |
+          if [ -z "${{ secrets.AWS_ROLE_TO_ASSUME }}" ]; then
+            echo "::error::AWS_ROLE_TO_ASSUME secret not configured"
+            echo "Please set up AWS OIDC infrastructure first using aws-setup/create-cicd-resources.tf"
+            exit 1
+          fi
+
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
