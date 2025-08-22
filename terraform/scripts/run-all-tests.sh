@@ -237,9 +237,15 @@ run_test() {
         cmd="$cmd -v"
     fi
     
+    # Validate script path for security
+    if [[ ! "$script_path" =~ ^[a-zA-Z0-9/_.-]+$ ]]; then
+        print_error "Invalid script path: $script_path"
+        return 1
+    fi
+    
     # Run the test
     if [[ -n "$log_file" ]]; then
-        if eval "$cmd" > "$log_file" 2>&1; then
+        if "$script_path" $script_args > "$log_file" 2>&1; then
             exit_code=0
         else
             exit_code=$?
@@ -252,7 +258,7 @@ run_test() {
             echo "--- End of output ---"
         fi
     else
-        if eval "$cmd"; then
+        if "$script_path" $script_args; then
             exit_code=0
         else
             exit_code=$?

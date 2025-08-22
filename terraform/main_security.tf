@@ -160,6 +160,60 @@ resource "aws_security_group" "ec2" {
 }
 
 # ========================================
+# KMS Key for WAF Logs
+# ========================================
+
+# KMS key for WAF log encryption
+resource "aws_kms_key" "waf_logs" {
+  description             = "KMS key for WAF log encryption"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Enable IAM User Permissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow CloudWatch Logs"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${var.aws_region}.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-${var.env}-waf-logs-key"
+  })
+}
+
+# KMS key alias
+resource "aws_kms_alias" "waf_logs" {
+  name          = "alias/${var.project_name}-${var.env}-waf-logs"
+  target_key_id = aws_kms_key.waf_logs.key_id
+}
+
+# Data source for current AWS account
+data "aws_caller_identity" "current" {}
+
+# ========================================
 # WAF Configuration
 # ========================================
 
@@ -237,6 +291,7 @@ resource "aws_wafv2_web_acl" "main" {
 resource "aws_cloudwatch_log_group" "waf_log_group" {
   name              = "/aws/wafv2/${var.project_name}-${var.env}"
   retention_in_days = var.cloudwatch_log_retention_days
+  kms_key_id        = aws_kms_key.waf_logs.arn
 
   tags = merge(local.common_tags, {
     Name = "${var.project_name}-${var.env}-waf-logs"

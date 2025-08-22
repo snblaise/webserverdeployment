@@ -16,7 +16,7 @@ resource "aws_budgets_budget" "monthly_cost_budget" {
   limit_amount = var.monthly_budget_limit
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
-  time_period_start = formatdate("YYYY-MM-01_00:00", timestamp())
+  time_period_start = formatdate("YYYY-MM-01_00:00", plantimestamp())
 
   cost_filters = {
     Tag = [
@@ -148,7 +148,7 @@ resource "aws_ce_anomaly_subscription" "cost_anomaly_subscription" {
 
   subscriber {
     type    = "EMAIL"
-    address = var.budget_alert_emails[0] # Use first email for anomaly alerts
+    address = length(var.budget_alert_emails) > 0 ? var.budget_alert_emails[0] : "admin@example.com"
   }
 
   threshold_expression {

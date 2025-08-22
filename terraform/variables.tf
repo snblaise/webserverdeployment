@@ -48,7 +48,7 @@ variable "az_count" {
 variable "allowed_http_cidrs" {
   description = "CIDR blocks allowed to access ALB on HTTP"
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+  # No default - force explicit security decision
   validation {
     condition = alltrue([
       for cidr in var.allowed_http_cidrs : can(cidrhost(cidr, 0))
