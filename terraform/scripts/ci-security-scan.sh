@@ -48,7 +48,7 @@ print_status "Running Checkov security scan..."
 mkdir -p results
 
 # Run Checkov with JSON output for parsing
-if checkov --config-file .checkov.yml -d . --compact --quiet --output json > checkov_results.json; then
+if checkov --config-file .checkov.yml -d . --compact --quiet --output json > checkov_results.json 2>/dev/null; then
     print_success "Checkov scan completed"
     
     # Move results file to results directory

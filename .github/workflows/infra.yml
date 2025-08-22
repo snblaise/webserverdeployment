@@ -397,12 +397,12 @@ jobs:
           
           if [ -f ".checkov.yml" ]; then
             echo "🔍 Running Checkov with configuration file..."
-            if ! checkov --config-file .checkov.yml -d . --output cli --output json --output-file checkov_results.json; then
+            if ! checkov --config-file .checkov.yml -d . --output json > checkov_results.json; then
               SECURITY_PASSED=false
             fi
           else
             echo "🔍 Running Checkov with default settings..."
-            if ! checkov -d . --output cli --output json --output-file checkov_results.json; then
+            if ! checkov -d . --output json > checkov_results.json; then
               SECURITY_PASSED=false
             fi
           fi
