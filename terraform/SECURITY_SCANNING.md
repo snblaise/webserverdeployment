@@ -53,7 +53,7 @@ cd terraform
 checkov --config-file .checkov.yml -d .
 
 # Generate JSON report
-checkov --config-file .checkov.yml -d . --output json --output-file-path . --output-file-name checkov_results.json
+checkov --config-file .checkov.yml -d . --output json --output-file checkov_results.json
 ```
 
 ### Common Checkov Violations and Fixes

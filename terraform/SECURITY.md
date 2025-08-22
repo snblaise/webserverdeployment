@@ -93,7 +93,7 @@ checkov --config-file .checkov.yml -d .
 checkov -d . --check CKV_AWS_79,CKV_AWS_8
 
 # Generate JSON output for analysis
-checkov --config-file .checkov.yml -d . --output json --output-file-path . --output-file-name results.json
+checkov --config-file .checkov.yml -d . --output json --output-file results.json
 ```
 
 #### terraform-compliance
