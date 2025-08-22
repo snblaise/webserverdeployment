@@ -13,6 +13,8 @@ enable_detailed_monitoring = false
 
 # Security Configuration
 allowed_http_cidrs = ["0.0.0.0/0"] # Open for testing - restrict in production
+enable_alb_access_logs = true
+ssl_certificate_arn = "" # No SSL certificate for test environment
 
 # Monitoring Configuration
 enable_enhanced_monitoring = false
