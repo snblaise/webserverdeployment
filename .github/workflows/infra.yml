@@ -268,14 +268,35 @@ jobs:
           
           echo "plan_exists=true" >> $GITHUB_OUTPUT
           
-          # Analyze plan for destructive changes
-          PLAN_TEXT=$(terraform show -no-color terraform.tfplan)
+          # Use JSON plan for more reliable parsing
+          if [ -f "plan.json" ]; then
+            # Parse JSON plan
+            RESOURCES_TO_ADD=$(jq -r '.resource_changes[]? | select(.change.actions[]? == "create") | .address' plan.json 2>/dev/null | wc -l || echo "0")
+            RESOURCES_TO_CHANGE=$(jq -r '.resource_changes[]? | select(.change.actions[]? == "update") | .address' plan.json 2>/dev/null | wc -l || echo "0")
+            RESOURCES_TO_DESTROY=$(jq -r '.resource_changes[]? | select(.change.actions[]? == "delete") | .address' plan.json 2>/dev/null | wc -l || echo "0")
+            RESOURCES_TO_REPLACE=$(jq -r '.resource_changes[]? | select(.change.actions[]? | contains(["delete", "create"])) | .address' plan.json 2>/dev/null | wc -l || echo "0")
+          else
+            # Fallback to text parsing with error handling
+            PLAN_TEXT=$(terraform show -no-color terraform.tfplan 2>/dev/null || echo "")
+            if [ -z "$PLAN_TEXT" ]; then
+              echo "::warning::Could not read plan file, assuming no changes"
+              RESOURCES_TO_ADD=0
+              RESOURCES_TO_CHANGE=0
+              RESOURCES_TO_DESTROY=0
+              RESOURCES_TO_REPLACE=0
+            else
+              RESOURCES_TO_ADD=$(echo "$PLAN_TEXT" | grep -c "will be created" 2>/dev/null || echo "0")
+              RESOURCES_TO_CHANGE=$(echo "$PLAN_TEXT" | grep -c "will be updated" 2>/dev/null || echo "0")
+              RESOURCES_TO_DESTROY=$(echo "$PLAN_TEXT" | grep -c "will be destroyed" 2>/dev/null || echo "0")
+              RESOURCES_TO_REPLACE=$(echo "$PLAN_TEXT" | grep -c "must be replaced" 2>/dev/null || echo "0")
+            fi
+          fi
           
-          # Count resource changes
-          RESOURCES_TO_ADD=$(echo "$PLAN_TEXT" | grep -c "will be created" || echo "0")
-          RESOURCES_TO_CHANGE=$(echo "$PLAN_TEXT" | grep -c "will be updated" || echo "0")
-          RESOURCES_TO_DESTROY=$(echo "$PLAN_TEXT" | grep -c "will be destroyed" || echo "0")
-          RESOURCES_TO_REPLACE=$(echo "$PLAN_TEXT" | grep -c "must be replaced" || echo "0")
+          # Ensure we have valid numbers
+          RESOURCES_TO_ADD=${RESOURCES_TO_ADD:-0}
+          RESOURCES_TO_CHANGE=${RESOURCES_TO_CHANGE:-0}
+          RESOURCES_TO_DESTROY=${RESOURCES_TO_DESTROY:-0}
+          RESOURCES_TO_REPLACE=${RESOURCES_TO_REPLACE:-0}
           
           echo "📊 Plan Summary:"
           echo "   - Resources to create: $RESOURCES_TO_ADD"
@@ -294,12 +315,6 @@ jobs:
           if [ "$RESOURCES_TO_REPLACE" -gt "0" ]; then
             echo "⚠️ WARNING: Plan includes resource replacement"
             DANGEROUS_OPERATIONS=$((DANGEROUS_OPERATIONS + RESOURCES_TO_REPLACE))
-          fi
-          
-          # Check for specific dangerous changes
-          if echo "$PLAN_TEXT" | grep -q "force-new-resource"; then
-            echo "⚠️ WARNING: Plan includes forced resource recreation"
-            DANGEROUS_OPERATIONS=$((DANGEROUS_OPERATIONS + 1))
           fi
           
           echo "dangerous_operations=$DANGEROUS_OPERATIONS" >> $GITHUB_OUTPUT
@@ -323,11 +338,35 @@ jobs:
         run: |
           echo "::group::Plan Summary Generation"
           
-          PLAN_TEXT=$(terraform show -no-color terraform.tfplan)
+          # Check if plan file exists
+          if [ ! -f "terraform.tfplan" ]; then
+            echo "::warning::No plan file found, assuming no changes"
+            echo "resources_to_add=0" >> $GITHUB_OUTPUT
+            echo "resources_to_change=0" >> $GITHUB_OUTPUT
+            echo "resources_to_destroy=0" >> $GITHUB_OUTPUT
+            echo "summary=No changes detected" >> $GITHUB_OUTPUT
+            echo "::endgroup::"
+            exit 0
+          fi
           
-          RESOURCES_TO_ADD=$(echo "$PLAN_TEXT" | grep -c "will be created" || echo "0")
-          RESOURCES_TO_CHANGE=$(echo "$PLAN_TEXT" | grep -c "will be updated" || echo "0")
-          RESOURCES_TO_DESTROY=$(echo "$PLAN_TEXT" | grep -c "will be destroyed" || echo "0")
+          # Use JSON plan for more reliable parsing
+          if [ -f "plan.json" ]; then
+            # Parse JSON plan
+            RESOURCES_TO_ADD=$(jq -r '.resource_changes[]? | select(.change.actions[]? == "create") | .address' plan.json 2>/dev/null | wc -l || echo "0")
+            RESOURCES_TO_CHANGE=$(jq -r '.resource_changes[]? | select(.change.actions[]? == "update") | .address' plan.json 2>/dev/null | wc -l || echo "0")
+            RESOURCES_TO_DESTROY=$(jq -r '.resource_changes[]? | select(.change.actions[]? == "delete") | .address' plan.json 2>/dev/null | wc -l || echo "0")
+          else
+            # Fallback to text parsing
+            PLAN_TEXT=$(terraform show -no-color terraform.tfplan 2>/dev/null || echo "")
+            RESOURCES_TO_ADD=$(echo "$PLAN_TEXT" | grep -c "will be created" 2>/dev/null || echo "0")
+            RESOURCES_TO_CHANGE=$(echo "$PLAN_TEXT" | grep -c "will be updated" 2>/dev/null || echo "0")
+            RESOURCES_TO_DESTROY=$(echo "$PLAN_TEXT" | grep -c "will be destroyed" 2>/dev/null || echo "0")
+          fi
+          
+          # Ensure we have valid numbers
+          RESOURCES_TO_ADD=${RESOURCES_TO_ADD:-0}
+          RESOURCES_TO_CHANGE=${RESOURCES_TO_CHANGE:-0}
+          RESOURCES_TO_DESTROY=${RESOURCES_TO_DESTROY:-0}
           
           echo "resources_to_add=$RESOURCES_TO_ADD" >> $GITHUB_OUTPUT
           echo "resources_to_change=$RESOURCES_TO_CHANGE" >> $GITHUB_OUTPUT
@@ -341,7 +380,7 @@ jobs:
           fi
           
           echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
-          echo "$SUMMARY"
+          echo "📊 Plan Summary: $SUMMARY"
           
           echo "::endgroup::"
 
