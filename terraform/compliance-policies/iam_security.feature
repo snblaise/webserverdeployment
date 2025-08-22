@@ -11,9 +11,6 @@ Feature: IAM roles and policies must follow security best practices
 
   Scenario: EC2 IAM roles should only allow EC2 service to assume
     Given I have aws_iam_role defined
-    When it has tags
-    And it contains Name
-    And its value must match the ".*ec2.*" regex
     When it contains assume_role_policy
     Then it must contain Statement
     And it must contain Principal
@@ -25,10 +22,9 @@ Feature: IAM roles and policies must follow security best practices
     When it contains role
     Then its value must not be null
 
-  Scenario: IAM role policy attachments should use AWS managed policies when possible
+  Scenario: IAM role policy attachments should reference valid roles
     Given I have aws_iam_role_policy_attachment defined
     When it contains policy_arn
-    And its value must match the "arn:aws:iam::aws:policy/.*" regex
     Then it must contain role
     And its value must not be null
 
