@@ -94,14 +94,21 @@ gh secret set INFRACOST_API_KEY --body "ico-xxxxxxxxxxxxxxxx"
 
 #### Error: Checkov or terraform-compliance failures
 
-**Cause**: Security policy violations or misconfigurations.
+**Cause**: Security policy violations, misconfigurations, or invalid Checkov arguments.
+
+**Common Checkov Errors**:
+- `unrecognized arguments: --output-file-name` - Fixed in latest workflow
+- `unrecognized arguments: --severity` - Use proper Checkov syntax
 
 **Solution**:
 ```bash
 # Run security scans locally
 cd terraform
 
-# Checkov scan
+# Checkov scan (correct syntax)
+checkov -d . --output cli --output json --output-file checkov_results.json
+
+# Alternative with specific framework
 checkov -f . --framework terraform
 
 # terraform-compliance (if configured)
