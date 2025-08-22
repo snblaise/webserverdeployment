@@ -18,8 +18,7 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-# Data source for current AWS account ID
-data "aws_caller_identity" "current" {}
+# Note: aws_caller_identity data source is defined in cost_monitoring.tf
 
 # ========================================
 # S3 Bucket for ALB Access Logs
@@ -29,7 +28,7 @@ data "aws_caller_identity" "current" {}
 resource "aws_s3_bucket" "alb_access_logs" {
   count = var.create_alb && var.enable_alb_access_logs && var.alb_access_logs_bucket == "" ? 1 : 0
 
-  bucket        = "${var.project_name}-${var.env}-alb-access-logs-${random_id.bucket_suffix[0].hex}"
+  bucket        = "${var.project_name}-${var.env}-alb-access-logs-${random_id.bucket_suffix.hex}"
   force_destroy = var.env != "prod"
 
   tags = merge(local.common_tags, {
@@ -37,12 +36,7 @@ resource "aws_s3_bucket" "alb_access_logs" {
   })
 }
 
-# Random ID for bucket suffix to ensure uniqueness
-resource "random_id" "bucket_suffix" {
-  count = var.create_alb && var.enable_alb_access_logs && var.alb_access_logs_bucket == "" ? 1 : 0
-
-  byte_length = 4
-}
+# Note: random_id resource "bucket_suffix" is defined in patching.tf
 
 # S3 bucket versioning
 resource "aws_s3_bucket_versioning" "alb_access_logs" {
