@@ -409,8 +409,8 @@ jobs:
           
           # Parse results
           if [ -f "checkov_results.json" ]; then
-            FAILED_CHECKS=$(jq -r '.results.failed_checks | length' checkov_results.json 2>/dev/null || echo "0")
-            PASSED_CHECKS=$(jq -r '.results.passed_checks | length' checkov_results.json 2>/dev/null || echo "0")
+            FAILED_CHECKS=$(jq -r '.summary.failed // 0' checkov_results.json 2>/dev/null || echo "0")
+            PASSED_CHECKS=$(jq -r '.summary.passed // 0' checkov_results.json 2>/dev/null || echo "0")
             
             echo "📊 Security Scan Results:"
             echo "   - Passed: $PASSED_CHECKS"
