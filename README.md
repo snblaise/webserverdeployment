@@ -47,7 +47,7 @@ curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/
 1. **Clone the repository:**
    ```bash
    git clone <repository-url>
-   cd secure-cicd-pipeline
+   cd webserverdeployment
    ```
 
 2. **Configure GitHub Secrets:**

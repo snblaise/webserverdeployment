@@ -1,6 +1,6 @@
 # Test Environment Configuration
 env = "test"
-project_name = "secure-cicd-pipeline"
+project_name = "webserverdeployment"
 
 # Network Configuration
 vpc_cidr = "10.0.0.0/16"

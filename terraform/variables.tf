@@ -175,7 +175,7 @@ variable "owner" {
 variable "application" {
   description = "Application name for resource tagging"
   type        = string
-  default     = "Secure CI/CD Pipeline"
+  default     = "Web Server Deployment"
 }
 
 variable "additional_tags" {

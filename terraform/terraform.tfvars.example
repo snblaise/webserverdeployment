@@ -15,7 +15,7 @@
 #
 
 # Project Configuration
-project_name = "secure-cicd-pipeline"
+project_name = "webserverdeployment"
 env          = "staging"
 
 # AWS Configuration
@@ -54,9 +54,9 @@ patch_schedule = "cron(0 2 ? * SUN *)"  # Sundays at 2 AM UTC
 # Tagging Configuration
 cost_center = "devops"
 owner       = "DevOps Team"
-application = "Secure CI/CD Pipeline"
+application = "Web Server Deployment"
 additional_tags = {
-  "Repository" = "secure-cicd-pipeline"
+  "Repository" = "webserverdeployment"
   "Team"       = "Platform Engineering"
 }# Cost M
 onitoring Configuration
