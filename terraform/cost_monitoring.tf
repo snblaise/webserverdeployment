@@ -18,11 +18,12 @@ resource "aws_budgets_budget" "monthly_cost_budget" {
   time_unit    = "MONTHLY"
   time_period_start = formatdate("YYYY-MM-01_00:00", plantimestamp())
 
-  cost_filters = {
-    Tag = [
-      "Project:${var.project_name}",
-      "Environment:${var.env}"
-    ]
+  cost_filter {
+    dimension {
+      key           = "Service"
+      values        = ["Amazon Elastic Compute Cloud - Compute"]
+      match_options = ["EQUALS"]
+    }
   }
 
   # Alert when 80% of budget is reached
@@ -113,62 +114,7 @@ resource "aws_cloudwatch_metric_alarm" "estimated_charges" {
   )
 }
 
-# Cost anomaly detection (for advanced cost monitoring)
-resource "aws_ce_anomaly_detector" "cost_anomaly" {
-  count = var.enable_cost_monitoring && var.enable_cost_anomaly_detection ? 1 : 0
 
-  name         = "${var.project_name}-${var.env}-cost-anomaly"
-  monitor_type = "DIMENSIONAL"
-
-  specification = jsonencode({
-    Dimension = "SERVICE"
-    MatchOptions = ["EQUALS"]
-    Values = ["Amazon Elastic Compute Cloud - Compute", "Amazon Elastic Load Balancing", "Amazon Virtual Private Cloud"]
-  })
-
-  tags = merge(
-    local.common_tags,
-    {
-      Name        = "${var.project_name}-${var.env}-cost-anomaly"
-      Description = "Cost anomaly detection for ${var.project_name} ${var.env}"
-    }
-  )
-}
-
-# Cost anomaly subscription
-resource "aws_ce_anomaly_subscription" "cost_anomaly_subscription" {
-  count = var.enable_cost_monitoring && var.enable_cost_anomaly_detection ? 1 : 0
-
-  name      = "${var.project_name}-${var.env}-cost-anomaly-subscription"
-  frequency = "DAILY"
-  
-  monitor_arn_list = [
-    aws_ce_anomaly_detector.cost_anomaly[0].arn
-  ]
-
-  subscriber {
-    type    = "EMAIL"
-    address = length(var.budget_alert_emails) > 0 ? var.budget_alert_emails[0] : "admin@example.com"
-  }
-
-  threshold_expression {
-    and {
-      dimension {
-        key           = "ANOMALY_TOTAL_IMPACT_ABSOLUTE"
-        values        = [tostring(var.cost_anomaly_threshold)]
-        match_options = ["GREATER_THAN_OR_EQUAL"]
-      }
-    }
-  }
-
-  tags = merge(
-    local.common_tags,
-    {
-      Name        = "${var.project_name}-${var.env}-cost-anomaly-subscription"
-      Description = "Cost anomaly subscription for ${var.project_name} ${var.env}"
-    }
-  )
-}
 
 # Output cost monitoring information
 output "cost_monitoring_enabled" {
