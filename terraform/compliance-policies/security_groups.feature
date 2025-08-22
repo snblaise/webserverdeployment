@@ -9,7 +9,7 @@ Feature: Security groups must follow least privilege
     And it contains from_port
     And its value is 22
     And it contains cidr_blocks
-    Then it must not contain ["0.0.0.0/0"]
+    Then its value must not be "0.0.0.0/0"
 
   Scenario: Security groups should not allow unrestricted RDP access
     Given I have aws_security_group defined
@@ -17,7 +17,7 @@ Feature: Security groups must follow least privilege
     And it contains from_port
     And its value is 3389
     And it contains cidr_blocks
-    Then it must not contain ["0.0.0.0/0"]
+    Then its value must not be "0.0.0.0/0"
 
   Scenario: Security groups should not allow unrestricted HTTP access from internet
     Given I have aws_security_group defined
@@ -28,7 +28,7 @@ Feature: Security groups must follow least privilege
     And it contains from_port
     And its value is 80
     And it contains cidr_blocks
-    And it contains ["0.0.0.0/0"]
+    And its value is "0.0.0.0/0"
     Then it must fail
 
   Scenario: EC2 security groups should only accept traffic from ALB
@@ -51,7 +51,7 @@ Feature: Security groups must follow least privilege
     And it contains from_port
     And its value is 80
     Then it must contain cidr_blocks
-    And it must not contain ["0.0.0.0/0"]
+    And its value must not be "0.0.0.0/0"
 
   Scenario: Security groups should have proper lifecycle management
     Given I have aws_security_group defined
@@ -68,4 +68,4 @@ Feature: Security groups must follow least privilege
     And it contains from_port
     And its value is 443
     Then it must contain cidr_blocks
-    And it must not contain ["0.0.0.0/0"]
+    And its value must not be "0.0.0.0/0"
