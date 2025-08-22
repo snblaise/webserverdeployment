@@ -84,10 +84,8 @@ skip-check:
 check:
   - CKV_AWS_*   # Example: Run only AWS checks
 
-severity:
-  - CRITICAL
-  - HIGH
-  - MEDIUM
+# Note: Severity filtering is not supported in configuration
+# Use check patterns or skip-check to control which checks run
 ```
 
 ## 🚀 Integration in CI/CD

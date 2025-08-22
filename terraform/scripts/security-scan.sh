@@ -61,7 +61,7 @@ print_success "All required tools are available"
 print_status "Running Checkov security scan..."
 
 # Run Checkov with both CLI and JSON output
-if checkov --config-file .checkov.yml -d . --output cli --output json --output-file-path . --output-file-name checkov_results.json; then
+if checkov --config-file .checkov.yml -d . --output cli --output json --output-file checkov_results.json; then
     CHECKOV_FAILED=0
 else
     CHECKOV_FAILED=1
