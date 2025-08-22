@@ -210,8 +210,7 @@ resource "aws_kms_alias" "waf_logs" {
   target_key_id = aws_kms_key.waf_logs.key_id
 }
 
-# Data source for current AWS account
-data "aws_caller_identity" "current" {}
+
 
 # ========================================
 # WAF Configuration

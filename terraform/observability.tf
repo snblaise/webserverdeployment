@@ -258,9 +258,3 @@ resource "aws_cloudwatch_dashboard" "infrastructure" {
 
 }
 
-# ========================================
-# Data Sources
-# ========================================
-
-# Get current AWS account ID
-data "aws_caller_identity" "current" {}
