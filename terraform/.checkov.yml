@@ -84,11 +84,9 @@ check:
   - CKV_AWS_109  # Ensure IAM policies does not allow privilege escalation
   - CKV_AWS_111  # Ensure IAM policies does not allow write access without constraints
 
-# Severity levels to report
-severity:
-  - CRITICAL
-  - HIGH
-  - MEDIUM
+# Note: Severity filtering is handled through check selection above
+# Checkov doesn't support severity-based filtering in configuration
+# Use --check or skip-check to control which checks run
 
 # Custom policies directory (if we add custom policies later)
 # external-checks-dir: ./custom-policies
