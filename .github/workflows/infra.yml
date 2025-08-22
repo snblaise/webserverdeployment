@@ -78,11 +78,18 @@ jobs:
 
       - name: Terraform Init
         id: init
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
           echo "::group::Terraform Initialization"
+          # Sanitize branch name for safe usage
+          SAFE_BRANCH=$(echo "$BRANCH_NAME" | tr -cd '[:alnum:]-_' | cut -c1-50)
+          SAFE_REPO=$(echo "$REPO_NAME" | tr -cd '[:alnum:]-_')
+          
           terraform init \
             -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-            -backend-config="key=infrastructure/${{ github.event.repository.name }}/preview-${{ github.head_ref }}/terraform.tfstate" \
+            -backend-config="key=infrastructure/${SAFE_REPO}/preview-${SAFE_BRANCH}/terraform.tfstate" \
             -backend-config="region=${{ env.AWS_REGION }}" \
             -backend-config="dynamodb_table=${{ secrets.TF_STATE_LOCK_TABLE }}"
           echo "::endgroup::"
@@ -202,14 +209,21 @@ jobs:
 
       - name: Generate Terraform Plan
         id: plan_generation
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
           echo "::group::Generate Terraform Plan"
+          
+          # Sanitize inputs for safe usage
+          SAFE_BRANCH=$(echo "$BRANCH_NAME" | tr -cd '[:alnum:]-_' | cut -c1-50)
+          SAFE_REPO=$(echo "$REPO_NAME" | tr -cd '[:alnum:]-_')
           
           # Generate single plan for all validation steps
           echo "Generating Terraform plan for validation and analysis..."
           terraform plan -out=main_plan.tfplan \
-            -var="env=preview-${{ github.head_ref }}" \
-            -var="project_name=${{ github.event.repository.name }}" \
+            -var="env=preview-${SAFE_BRANCH}" \
+            -var="project_name=${SAFE_REPO}" \
             -var="enable_preview=true" \
             -detailed-exitcode || {
             PLAN_EXIT_CODE=$?
