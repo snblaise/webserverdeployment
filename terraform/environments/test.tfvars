@@ -25,6 +25,11 @@ budget_limit = 25
 # Backup Configuration
 backup_retention_days = 7
 
+# Required for common_tags
+owner = "devops-team"
+application = "web-server"
+cost_center = "development"
+
 # Tags
 additional_tags = {
   Environment = "test"
