@@ -42,7 +42,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main[0].id
   cidr_block              = cidrsubnet(var.cidr_block, 8, count.index)
   availability_zone       = data.aws_availability_zones.available.names[count.index]
-  map_public_ip_on_launch = false  # Security best practice - don't auto-assign public IPs
+  map_public_ip_on_launch = false # Security best practice - don't auto-assign public IPs
 
   tags = merge(local.common_tags, {
     Name = "${var.project_name}-${var.env}-public-subnet-${count.index + 1}"
