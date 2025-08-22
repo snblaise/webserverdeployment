@@ -1087,15 +1087,16 @@ jobs:
         run: |
           terraform workspace select test || terraform workspace new test
 
-      - name: Check Existing Resources
-        id: check_resources
+      - name: Import Existing Resources
+        id: import_resources
         env:
           TF_VAR_env: test
         run: |
-          echo "::group::Check Existing Resources"
-          chmod +x scripts/check-existing-resources.sh
-          source ./scripts/check-existing-resources.sh
+          echo "::group::Import Existing Resources"
+          chmod +x scripts/import-and-refresh.sh
+          ./scripts/import-and-refresh.sh
           echo "::endgroup::"
+        continue-on-error: true
 
       - name: Terraform Plan
         id: plan
