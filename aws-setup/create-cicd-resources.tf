@@ -149,10 +149,9 @@ resource "aws_iam_role" "github_actions" {
 
 locals {
   cicd_permissions = [
-    "ec2:DescribeInstances", "ec2:DescribeInstanceStatus", "ec2:DescribeSecurityGroups",
-    "ec2:DescribeSubnets", "ec2:DescribeVpcs", "ec2:RunInstances", "ec2:TerminateInstances", "ec2:CreateTags",
-    "elasticloadbalancing:*", "wafv2:*", "cloudwatch:*", "sns:*", "ssm:*",
-    "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:PassRole", "iam:*RolePolicy", "iam:*InstanceProfile",
+    "ec2:*", "s3:*", "kms:*",
+    "elasticloadbalancing:*", "wafv2:*", "cloudwatch:*", "logs:*", "sns:*", "ssm:*",
+    "iam:*",
     "budgets:*", "ce:GetCostAndUsage", "ce:GetUsageReport"
   ]
 }

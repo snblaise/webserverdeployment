@@ -273,6 +273,10 @@ resource "aws_wafv2_web_acl" "main" {
       metric_name                = "CommonRuleSetMetric"
       sampled_requests_enabled   = true
     }
+
+    action {
+      allow {}
+    }
   }
 
   visibility_config {

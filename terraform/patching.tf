@@ -16,7 +16,7 @@ resource "aws_ssm_patch_baseline" "amazon_linux" {
 
     patch_filter {
       key    = "CLASSIFICATION"
-      values = ["Security", "Bugfix", "Critical"]
+      values = ["Security", "Bugfix"]
     }
 
     patch_filter {
@@ -69,7 +69,7 @@ resource "aws_ssm_association" "patch_deployment" {
 
   # Target instances by patch group tag
   targets {
-    key    = "tag:Patch Group"
+    key    = "tag:PatchGroup"
     values = ["${var.project_name}-${var.env}"]
   }
 
@@ -101,7 +101,7 @@ resource "aws_ssm_association" "patch_compliance_scan" {
 
   # Target instances by patch group tag
   targets {
-    key    = "tag:Patch Group"
+    key    = "tag:PatchGroup"
     values = ["${var.project_name}-${var.env}"]
   }
 
@@ -198,9 +198,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "patch_logs" {
       storage_class = "GLACIER"
     }
 
-    # Delete after retention period
+    # Delete after retention period (minimum 120 days to be greater than Glacier transition)
     expiration {
-      days = var.backup_retention_days * 4 # Keep patch logs 4x longer than backups
+      days = max(120, var.backup_retention_days * 4) # Keep patch logs 4x longer than backups, minimum 120 days
     }
 
     # Clean up incomplete multipart uploads

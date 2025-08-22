@@ -130,8 +130,8 @@ resource "aws_instance" "main" {
 
   # Patch group tagging for SSM
   tags = merge(local.common_tags, {
-    Name          = "${var.project_name}-${var.env}-instance-${count.index + 1}"
-    "Patch Group" = "${var.project_name}-${var.env}"
+    Name       = "${var.project_name}-${var.env}-instance-${count.index + 1}"
+    PatchGroup = "${var.project_name}-${var.env}"
   })
 
   lifecycle {
