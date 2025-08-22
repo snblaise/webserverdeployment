@@ -514,7 +514,11 @@ done
 echo ""
 echo "Total Checks: $TOTAL_CHECKS"
 echo "Failed Checks: $FAILED_CHECKS"
-echo "Success Rate: $(( (TOTAL_CHECKS - FAILED_CHECKS) * 100 / TOTAL_CHECKS ))%"
+if [[ $TOTAL_CHECKS -gt 0 ]]; then
+    echo "Success Rate: $(( (TOTAL_CHECKS - FAILED_CHECKS) * 100 / TOTAL_CHECKS ))%"
+else
+    echo "Success Rate: N/A (no checks performed)"
+fi
 
 if [[ $FAILED_CHECKS -eq 0 ]]; then
     print_success "🎉 All validation checks passed! Infrastructure is properly deployed and configured."
