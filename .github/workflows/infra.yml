@@ -1158,18 +1158,24 @@ jobs:
             IFS=',' read -ra INSTANCES <<< "$INSTANCE_IDS"
             for instance_id in "${INSTANCES[@]}"; do
               if [ -n "$instance_id" ]; then
-                # Get instance subnet
-                SUBNET_ID=$(aws ec2 describe-instances \
+                # Get instance subnet with error handling
+                if ! SUBNET_ID=$(aws ec2 describe-instances \
                   --instance-ids "$instance_id" \
                   --query 'Reservations[0].Instances[0].SubnetId' \
-                  --output text 2>/dev/null || echo "")
+                  --output text 2>/dev/null); then
+                  echo "::warning::Failed to get subnet for instance $instance_id"
+                  continue
+                fi
                 
                 if [ -n "$SUBNET_ID" ] && [ "$SUBNET_ID" != "None" ]; then
-                  # Check if subnet has route to internet gateway (public) or NAT gateway (private)
-                  ROUTE_TABLE=$(aws ec2 describe-route-tables \
+                  # Check if subnet has route to internet gateway with error handling
+                  if ! ROUTE_TABLE=$(aws ec2 describe-route-tables \
                     --filters "Name=association.subnet-id,Values=$SUBNET_ID" \
                     --query 'RouteTables[0].Routes[?GatewayId!=null && starts_with(GatewayId, `igw-`)]' \
-                    --output text 2>/dev/null || echo "")
+                    --output text 2>/dev/null); then
+                    echo "::warning::Failed to check route table for subnet $SUBNET_ID"
+                    continue
+                  fi
                   
                   if [ -z "$ROUTE_TABLE" ]; then
                     echo "✅ Instance $instance_id is in private subnet $SUBNET_ID"
@@ -1177,6 +1183,8 @@ jobs:
                     echo "❌ Instance $instance_id is in public subnet $SUBNET_ID"
                     exit 1
                   fi
+                else
+                  echo "::warning::Could not determine subnet for instance $instance_id"
                 fi
               fi
             done
