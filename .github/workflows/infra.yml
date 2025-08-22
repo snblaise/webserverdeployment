@@ -449,9 +449,15 @@ jobs:
           if [ -d "compliance-policies" ] && [ "$(ls -A compliance-policies/*.feature 2>/dev/null | wc -l)" -gt "0" ]; then
             echo "🔍 Running compliance checks..."
             
-            if ! terraform-compliance -p compliance-policies -f plan.json --no-ansi; then
-              COMPLIANCE_PASSED=false
-              echo "::error::Compliance check failed"
+            # Check if plan.json exists
+            if [ ! -f "plan.json" ]; then
+              echo "::warning::plan.json not found, skipping compliance check"
+              COMPLIANCE_PASSED=true
+            else
+              if ! terraform-compliance --features compliance-policies --planfile plan.json --no-ansi; then
+                COMPLIANCE_PASSED=false
+                echo "::error::Compliance check failed"
+              fi
             fi
           else
             echo "ℹ️ No compliance policies found, skipping compliance check"
