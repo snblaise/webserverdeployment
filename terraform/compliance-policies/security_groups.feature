@@ -8,16 +8,16 @@ Feature: Security groups must follow least privilege
     When it contains ingress
     And it contains from_port
     And its value is 22
-    Then it must not contain cidr_blocks
-    Or it must not contain ["0.0.0.0/0"]
+    And it contains cidr_blocks
+    Then it must not contain ["0.0.0.0/0"]
 
   Scenario: Security groups should not allow unrestricted RDP access
     Given I have aws_security_group defined
     When it contains ingress
     And it contains from_port
     And its value is 3389
-    Then it must not contain cidr_blocks
-    Or it must not contain ["0.0.0.0/0"]
+    And it contains cidr_blocks
+    Then it must not contain ["0.0.0.0/0"]
 
   Scenario: Security groups should not allow unrestricted HTTP access from internet
     Given I have aws_security_group defined
