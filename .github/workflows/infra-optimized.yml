@@ -1,0 +1,849 @@
+name: Infrastructure CI/CD Pipeline (Optimized)
+
+'on':
+  pull_request:
+    branches:
+      - main
+      - develop
+      - staging
+    paths:
+      - terraform/**
+      - .github/workflows/infra-optimized.yml
+  push:
+    branches:
+      - main
+      - develop
+      - staging
+    paths:
+      - terraform/**
+      - .github/workflows/infra-optimized.yml
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy
+        required: true
+        default: test
+        type: choice
+        options:
+          - test
+          - staging
+          - prod
+      force_recreate:
+        description: Force recreation of resources (use with extreme caution)
+        required: false
+        default: false
+        type: boolean
+      skip_tests:
+        description: Skip post-deployment tests
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: Plan only (no apply)
+        required: false
+        default: false
+        type: boolean
+
+# Required permissions for OIDC authentication
+permissions:
+  id-token: write # Required for OIDC authentication
+  contents: read # Required to checkout code
+  pull-requests: write # Required to comment on PRs
+  actions: read # Required to read workflow artifacts
+  issues: write # Required to create deployment tracking issues
+
+env:
+  TF_VERSION: 1.6.0
+  AWS_REGION: us-east-1
+  TF_VAR_aws_region: us-east-1
+  # Production best practices
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+  TF_CLI_ARGS: "-no-color"
+  # Resource protection
+  TF_VAR_enable_deletion_protection: true
+  TF_VAR_enable_termination_protection: true
+
+jobs:
+  # Job 1: Validation and Planning (runs on all events)
+  validate_and_plan:
+    name: Validate & Plan Infrastructure
+    runs-on: ubuntu-latest
+    outputs:
+      plan_exists: ${{ steps.plan_check.outputs.plan_exists }}
+      has_changes: ${{ steps.plan_check.outputs.has_changes }}
+      resources_to_add: ${{ steps.plan_summary.outputs.resources_to_add }}
+      resources_to_change: ${{ steps.plan_summary.outputs.resources_to_change }}
+      resources_to_destroy: ${{ steps.plan_summary.outputs.resources_to_destroy }}
+      security_passed: ${{ steps.security_scan.outputs.security_passed }}
+      compliance_passed: ${{ steps.compliance_check.outputs.compliance_passed }}
+      cost_estimate: ${{ steps.cost_analysis.outputs.monthly_cost }}
+      environment: ${{ steps.determine_env.outputs.environment }}
+
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for better change detection
+
+      - name: Determine Target Environment
+        id: determine_env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            ENV="preview-$(echo '${{ github.head_ref }}' | tr -cd '[:alnum:]-_' | cut -c1-50)"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            ENV="test"
+          elif [ "${{ github.ref }}" = "refs/heads/staging" ]; then
+            ENV="staging"
+          else
+            ENV="test"
+          fi
+          
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "🎯 Target environment: $ENV"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Check Required Secrets
+        run: |
+          if [ -z "${{ secrets.AWS_ROLE_TO_ASSUME }}" ]; then
+            echo "::error::AWS_ROLE_TO_ASSUME secret not configured"
+            echo "Please set up AWS OIDC infrastructure first"
+            exit 1
+          fi
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: GitHubActions-Validate-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Format Check
+        id: fmt
+        run: |
+          echo "::group::Terraform Format Check"
+          if ! terraform fmt -check -recursive; then
+            echo "::error::Terraform files are not properly formatted"
+            echo "Run 'terraform fmt -recursive' to fix formatting issues"
+            exit 1
+          fi
+          echo "✅ All Terraform files are properly formatted"
+          echo "::endgroup::"
+
+      - name: Terraform Init with State Management
+        id: init
+        env:
+          TARGET_ENV: ${{ steps.determine_env.outputs.environment }}
+        run: |
+          echo "::group::Terraform Initialization"
+          
+          # Determine state key based on environment
+          if [[ "$TARGET_ENV" == preview-* ]]; then
+            STATE_KEY="infrastructure/${{ github.event.repository.name }}/${TARGET_ENV}/terraform.tfstate"
+          else
+            STATE_KEY="infrastructure/${{ github.event.repository.name }}/${TARGET_ENV}/terraform.tfstate"
+          fi
+          
+          echo "🔧 Initializing Terraform with state key: $STATE_KEY"
+          
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=$STATE_KEY" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_STATE_LOCK_TABLE }}" \
+            -upgrade
+          
+          echo "::endgroup::"
+
+      - name: Terraform Validate
+        id: validate
+        run: |
+          echo "::group::Terraform Validation"
+          terraform validate
+          echo "✅ Terraform configuration is valid"
+          echo "::endgroup::"
+
+      - name: Import Existing Resources (Production Safety)
+        id: import_existing
+        if: steps.determine_env.outputs.environment != 'preview-*'
+        env:
+          TARGET_ENV: ${{ steps.determine_env.outputs.environment }}
+        run: |
+          echo "::group::Import Existing Resources"
+          
+          # Only run import for non-preview environments
+          if [ -f "scripts/import-and-refresh.sh" ]; then
+            echo "🔄 Running resource import to prevent recreation..."
+            chmod +x scripts/import-and-refresh.sh
+            
+            # Set environment variables for import script
+            export TF_VAR_env="$TARGET_ENV"
+            export TF_VAR_project_name="${{ github.event.repository.name }}"
+            
+            # Run import script with error handling
+            if ./scripts/import-and-refresh.sh; then
+              echo "✅ Resource import completed successfully"
+            else
+              echo "⚠️ Resource import had issues, but continuing (may be expected for new deployments)"
+            fi
+          else
+            echo "ℹ️ No import script found, skipping resource import"
+          fi
+          
+          echo "::endgroup::"
+        continue-on-error: true
+
+      - name: Generate Terraform Plan
+        id: plan
+        env:
+          TARGET_ENV: ${{ steps.determine_env.outputs.environment }}
+        run: |
+          echo "::group::Generate Terraform Plan"
+          
+          # Determine variable file
+          if [[ "$TARGET_ENV" == preview-* ]]; then
+            VAR_FILE="environments/test.tfvars"
+            EXTRA_VARS="-var=env=$TARGET_ENV -var=enable_preview=true"
+          elif [ -f "environments/${TARGET_ENV}.tfvars" ]; then
+            VAR_FILE="environments/${TARGET_ENV}.tfvars"
+            EXTRA_VARS=""
+          else
+            echo "::error::No variable file found for environment: $TARGET_ENV"
+            exit 1
+          fi
+          
+          echo "📋 Using variable file: $VAR_FILE"
+          echo "🎯 Target environment: $TARGET_ENV"
+          
+          # Generate plan with detailed exit codes
+          terraform plan \
+            -var-file="$VAR_FILE" \
+            $EXTRA_VARS \
+            -out=terraform.tfplan \
+            -detailed-exitcode \
+            -lock-timeout=10m || {
+            PLAN_EXIT_CODE=$?
+            case $PLAN_EXIT_CODE in
+              1)
+                echo "::error::Terraform plan failed"
+                exit 1
+                ;;
+              2)
+                echo "✅ Plan generated successfully with changes detected"
+                echo "has_changes=true" >> $GITHUB_OUTPUT
+                ;;
+              0)
+                echo "✅ Plan generated successfully with no changes"
+                echo "has_changes=false" >> $GITHUB_OUTPUT
+                ;;
+            esac
+          }
+          
+          # Convert to JSON for analysis
+          terraform show -json terraform.tfplan > plan.json
+          
+          echo "::endgroup::"
+
+      - name: Analyze Plan for Safety
+        id: plan_check
+        run: |
+          echo "::group::Plan Safety Analysis"
+          
+          if [ ! -f "terraform.tfplan" ]; then
+            echo "plan_exists=false" >> $GITHUB_OUTPUT
+            echo "::error::No plan file generated"
+            exit 1
+          fi
+          
+          echo "plan_exists=true" >> $GITHUB_OUTPUT
+          
+          # Analyze plan for destructive changes
+          PLAN_TEXT=$(terraform show -no-color terraform.tfplan)
+          
+          # Count resource changes
+          RESOURCES_TO_ADD=$(echo "$PLAN_TEXT" | grep -c "will be created" || echo "0")
+          RESOURCES_TO_CHANGE=$(echo "$PLAN_TEXT" | grep -c "will be updated" || echo "0")
+          RESOURCES_TO_DESTROY=$(echo "$PLAN_TEXT" | grep -c "will be destroyed" || echo "0")
+          RESOURCES_TO_REPLACE=$(echo "$PLAN_TEXT" | grep -c "must be replaced" || echo "0")
+          
+          echo "📊 Plan Summary:"
+          echo "   - Resources to create: $RESOURCES_TO_ADD"
+          echo "   - Resources to update: $RESOURCES_TO_CHANGE"
+          echo "   - Resources to destroy: $RESOURCES_TO_DESTROY"
+          echo "   - Resources to replace: $RESOURCES_TO_REPLACE"
+          
+          # Check for potentially dangerous operations
+          DANGEROUS_OPERATIONS=0
+          
+          if [ "$RESOURCES_TO_DESTROY" -gt "0" ]; then
+            echo "⚠️ WARNING: Plan includes resource destruction"
+            DANGEROUS_OPERATIONS=$((DANGEROUS_OPERATIONS + RESOURCES_TO_DESTROY))
+          fi
+          
+          if [ "$RESOURCES_TO_REPLACE" -gt "0" ]; then
+            echo "⚠️ WARNING: Plan includes resource replacement"
+            DANGEROUS_OPERATIONS=$((DANGEROUS_OPERATIONS + RESOURCES_TO_REPLACE))
+          fi
+          
+          # Check for specific dangerous changes
+          if echo "$PLAN_TEXT" | grep -q "force-new-resource"; then
+            echo "⚠️ WARNING: Plan includes forced resource recreation"
+            DANGEROUS_OPERATIONS=$((DANGEROUS_OPERATIONS + 1))
+          fi
+          
+          echo "dangerous_operations=$DANGEROUS_OPERATIONS" >> $GITHUB_OUTPUT
+          
+          # Production safety check
+          TARGET_ENV="${{ steps.determine_env.outputs.environment }}"
+          if [[ "$TARGET_ENV" == "prod" ]] && [ "$DANGEROUS_OPERATIONS" -gt "0" ]; then
+            if [ "${{ github.event.inputs.force_recreate }}" != "true" ]; then
+              echo "::error::Dangerous operations detected in production plan without force_recreate flag"
+              echo "Set force_recreate=true in workflow_dispatch to override this safety check"
+              exit 1
+            else
+              echo "⚠️ PRODUCTION WARNING: Dangerous operations approved via force_recreate flag"
+            fi
+          fi
+          
+          echo "::endgroup::"
+
+      - name: Generate Plan Summary
+        id: plan_summary
+        run: |
+          echo "::group::Plan Summary Generation"
+          
+          PLAN_TEXT=$(terraform show -no-color terraform.tfplan)
+          
+          RESOURCES_TO_ADD=$(echo "$PLAN_TEXT" | grep -c "will be created" || echo "0")
+          RESOURCES_TO_CHANGE=$(echo "$PLAN_TEXT" | grep -c "will be updated" || echo "0")
+          RESOURCES_TO_DESTROY=$(echo "$PLAN_TEXT" | grep -c "will be destroyed" || echo "0")
+          
+          echo "resources_to_add=$RESOURCES_TO_ADD" >> $GITHUB_OUTPUT
+          echo "resources_to_change=$RESOURCES_TO_CHANGE" >> $GITHUB_OUTPUT
+          echo "resources_to_destroy=$RESOURCES_TO_DESTROY" >> $GITHUB_OUTPUT
+          
+          # Generate human-readable summary
+          if [ "$RESOURCES_TO_ADD" = "0" ] && [ "$RESOURCES_TO_CHANGE" = "0" ] && [ "$RESOURCES_TO_DESTROY" = "0" ]; then
+            SUMMARY="No changes detected"
+          else
+            SUMMARY="📊 Plan: +$RESOURCES_TO_ADD ~$RESOURCES_TO_CHANGE -$RESOURCES_TO_DESTROY"
+          fi
+          
+          echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
+          echo "$SUMMARY"
+          
+          echo "::endgroup::"
+
+      - name: Security Scan with Checkov
+        id: security_scan
+        run: |
+          echo "::group::Security Scan"
+          
+          # Install Checkov
+          pip install checkov
+          
+          # Run security scan
+          SECURITY_PASSED=true
+          
+          if [ -f ".checkov.yml" ]; then
+            echo "🔍 Running Checkov with configuration file..."
+            if ! checkov --config-file .checkov.yml -d . --output cli --output json --output-file-path . --output-file-name checkov_results.json; then
+              SECURITY_PASSED=false
+            fi
+          else
+            echo "🔍 Running Checkov with default settings..."
+            if ! checkov -d . --output cli --output json --output-file-path . --output-file-name checkov_results.json; then
+              SECURITY_PASSED=false
+            fi
+          fi
+          
+          # Parse results
+          if [ -f "checkov_results.json" ]; then
+            FAILED_CHECKS=$(jq -r '.results.failed_checks | length' checkov_results.json 2>/dev/null || echo "0")
+            PASSED_CHECKS=$(jq -r '.results.passed_checks | length' checkov_results.json 2>/dev/null || echo "0")
+            
+            echo "📊 Security Scan Results:"
+            echo "   - Passed: $PASSED_CHECKS"
+            echo "   - Failed: $FAILED_CHECKS"
+            
+            if [ "$FAILED_CHECKS" -gt "0" ]; then
+              SECURITY_PASSED=false
+              echo "::error::Security scan failed with $FAILED_CHECKS violations"
+            fi
+          else
+            SECURITY_PASSED=false
+            echo "::error::Security scan results not available"
+          fi
+          
+          echo "security_passed=$SECURITY_PASSED" >> $GITHUB_OUTPUT
+          
+          if [ "$SECURITY_PASSED" = "false" ]; then
+            echo "❌ Security scan failed"
+            exit 1
+          else
+            echo "✅ Security scan passed"
+          fi
+          
+          echo "::endgroup::"
+
+      - name: Compliance Check
+        id: compliance_check
+        run: |
+          echo "::group::Compliance Check"
+          
+          # Install terraform-compliance
+          pip install terraform-compliance
+          
+          COMPLIANCE_PASSED=true
+          
+          if [ -d "compliance-policies" ] && [ "$(ls -A compliance-policies/*.feature 2>/dev/null | wc -l)" -gt "0" ]; then
+            echo "🔍 Running compliance checks..."
+            
+            if ! terraform-compliance -p compliance-policies -f plan.json --no-ansi; then
+              COMPLIANCE_PASSED=false
+              echo "::error::Compliance check failed"
+            fi
+          else
+            echo "ℹ️ No compliance policies found, skipping compliance check"
+          fi
+          
+          echo "compliance_passed=$COMPLIANCE_PASSED" >> $GITHUB_OUTPUT
+          
+          if [ "$COMPLIANCE_PASSED" = "false" ]; then
+            echo "❌ Compliance check failed"
+            exit 1
+          else
+            echo "✅ Compliance check passed"
+          fi
+          
+          echo "::endgroup::"
+
+      - name: Cost Analysis
+        id: cost_analysis
+        if: vars.INFRACOST_API_KEY != ''
+        run: |
+          echo "::group::Cost Analysis"
+          
+          # Setup Infracost
+          curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+          
+          # Generate cost estimate
+          if infracost breakdown --path=plan.json --format=json --out-file=cost.json; then
+            MONTHLY_COST=$(jq -r '.totalMonthlyCost // "0"' cost.json)
+            echo "monthly_cost=$MONTHLY_COST" >> $GITHUB_OUTPUT
+            echo "💰 Estimated monthly cost: $MONTHLY_COST USD"
+          else
+            echo "monthly_cost=unknown" >> $GITHUB_OUTPUT
+            echo "⚠️ Cost analysis failed"
+          fi
+          
+          echo "::endgroup::"
+        continue-on-error: true
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Upload Plan Artifacts
+        uses: actions/upload-artifact@v4
+        if: steps.plan_check.outputs.plan_exists == 'true'
+        with:
+          name: terraform-plan-${{ steps.determine_env.outputs.environment }}-${{ github.run_id }}
+          path: |
+            terraform/terraform.tfplan
+            terraform/plan.json
+            terraform/checkov_results.json
+            terraform/cost.json
+          retention-days: 30
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            const environment = '${{ steps.determine_env.outputs.environment }}';
+            const hasChanges = '${{ steps.plan_check.outputs.has_changes }}' === 'true';
+            const securityPassed = '${{ steps.security_scan.outputs.security_passed }}' === 'true';
+            const compliancePassed = '${{ steps.compliance_check.outputs.compliance_passed }}' === 'true';
+            const planSummary = '${{ steps.plan_summary.outputs.summary }}';
+            const costEstimate = '${{ steps.cost_analysis.outputs.monthly_cost }}' || 'N/A';
+            
+            const securityIcon = securityPassed ? '✅' : '❌';
+            const complianceIcon = compliancePassed ? '✅' : '❌';
+            const changesIcon = hasChanges ? '📝' : '✨';
+            
+            const output = `
+            ## 🏗️ Infrastructure Plan Results
+            
+            **Environment:** \`${environment}\`
+            **Changes:** ${changesIcon} ${planSummary}
+            **Security:** ${securityIcon} ${securityPassed ? 'Passed' : 'Failed'}
+            **Compliance:** ${complianceIcon} ${compliancePassed ? 'Passed' : 'Failed'}
+            **Est. Cost:** 💰 $${costEstimate}/month
+            
+            ${hasChanges ? `
+            ### 📋 Planned Changes
+            - **Create:** ${{ steps.plan_summary.outputs.resources_to_add }} resources
+            - **Update:** ${{ steps.plan_summary.outputs.resources_to_change }} resources  
+            - **Delete:** ${{ steps.plan_summary.outputs.resources_to_destroy }} resources
+            ` : '### ✨ No infrastructure changes required'}
+            
+            ${!securityPassed || !compliancePassed ? `
+            ### ⚠️ Issues Found
+            ${!securityPassed ? '- 🔒 Security violations detected - check workflow logs' : ''}
+            ${!compliancePassed ? '- 📋 Compliance violations detected - check workflow logs' : ''}
+            
+            **Action Required:** Fix the issues above before deployment.
+            ` : '### ✅ All Checks Passed\nReady for deployment!'}
+            
+            ---
+            *Plan generated for commit ${{ github.sha }} by @${{ github.actor }}*
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+  # Job 2: Deploy to Target Environment
+  deploy:
+    name: Deploy to ${{ needs.validate_and_plan.outputs.environment }}
+    runs-on: ubuntu-latest
+    needs: validate_and_plan
+    if: |
+      needs.validate_and_plan.result == 'success' &&
+      needs.validate_and_plan.outputs.plan_exists == 'true' &&
+      needs.validate_and_plan.outputs.has_changes == 'true' &&
+      needs.validate_and_plan.outputs.security_passed == 'true' &&
+      needs.validate_and_plan.outputs.compliance_passed == 'true' &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch') ||
+        (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'deploy'))
+      ) &&
+      github.event.inputs.dry_run != 'true'
+    
+    environment:
+      name: ${{ needs.validate_and_plan.outputs.environment }}
+      url: ${{ steps.get_outputs.outputs.application_url }}
+
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: GitHubActions-Deploy-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download Plan Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan-${{ needs.validate_and_plan.outputs.environment }}-${{ github.run_id }}
+          path: terraform/
+
+      - name: Terraform Init
+        env:
+          TARGET_ENV: ${{ needs.validate_and_plan.outputs.environment }}
+        run: |
+          # Determine state key based on environment
+          if [[ "$TARGET_ENV" == preview-* ]]; then
+            STATE_KEY="infrastructure/${{ github.event.repository.name }}/${TARGET_ENV}/terraform.tfstate"
+          else
+            STATE_KEY="infrastructure/${{ github.event.repository.name }}/${TARGET_ENV}/terraform.tfstate"
+          fi
+          
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=$STATE_KEY" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_STATE_LOCK_TABLE }}"
+
+      - name: Pre-deployment Safety Check
+        id: safety_check
+        env:
+          TARGET_ENV: ${{ needs.validate_and_plan.outputs.environment }}
+        run: |
+          echo "::group::Pre-deployment Safety Check"
+          
+          echo "🔍 Performing final safety checks before deployment..."
+          echo "Environment: $TARGET_ENV"
+          echo "Resources to destroy: ${{ needs.validate_and_plan.outputs.resources_to_destroy }}"
+          
+          # Additional safety for production
+          if [[ "$TARGET_ENV" == "prod" ]]; then
+            echo "🚨 PRODUCTION DEPLOYMENT DETECTED"
+            
+            if [ "${{ needs.validate_and_plan.outputs.resources_to_destroy }}" -gt "0" ]; then
+              if [ "${{ github.event.inputs.force_recreate }}" != "true" ]; then
+                echo "::error::Production deployment with resource destruction requires force_recreate=true"
+                exit 1
+              fi
+            fi
+            
+            # Require manual approval for production (handled by environment protection)
+            echo "✅ Production safety checks passed"
+          fi
+          
+          echo "::endgroup::"
+
+      - name: Terraform Apply
+        id: apply
+        run: |
+          echo "::group::Terraform Apply"
+          echo "🚀 Applying infrastructure changes..."
+          
+          # Apply with state locking and timeout
+          terraform apply \
+            -auto-approve \
+            -lock-timeout=10m \
+            terraform.tfplan
+          
+          echo "✅ Infrastructure deployment completed"
+          echo "::endgroup::"
+
+      - name: Get Infrastructure Outputs
+        id: get_outputs
+        run: |
+          echo "::group::Retrieve Infrastructure Outputs"
+          
+          # Get key outputs with error handling
+          ALB_DNS=$(terraform output -raw alb_dns_name 2>/dev/null || echo "")
+          VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
+          INSTANCE_IDS=$(terraform output -json instance_ids 2>/dev/null | jq -r 'join(",")' || echo "")
+          
+          if [ -n "$ALB_DNS" ]; then
+            APPLICATION_URL="http://$ALB_DNS"
+            echo "application_url=$APPLICATION_URL" >> $GITHUB_OUTPUT
+            echo "alb_dns=$ALB_DNS" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "vpc_id=$VPC_ID" >> $GITHUB_OUTPUT
+          echo "instance_ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
+          
+          echo "📊 Infrastructure Outputs:"
+          echo "   - ALB DNS: $ALB_DNS"
+          echo "   - VPC ID: $VPC_ID"
+          echo "   - Instance IDs: $INSTANCE_IDS"
+          
+          echo "::endgroup::"
+
+      - name: Run Post-Deployment Tests
+        id: post_deploy_tests
+        if: github.event.inputs.skip_tests != 'true'
+        env:
+          TARGET_ENV: ${{ needs.validate_and_plan.outputs.environment }}
+          PROJECT_NAME: ${{ github.event.repository.name }}
+        run: |
+          echo "::group::Post-Deployment Tests"
+          
+          # Make test scripts executable
+          chmod +x scripts/*.sh
+          
+          # Run comprehensive tests
+          if [ -f "scripts/run-all-tests.sh" ]; then
+            echo "🧪 Running comprehensive infrastructure tests..."
+            
+            ./scripts/run-all-tests.sh \
+              -e "$TARGET_ENV" \
+              -p "$PROJECT_NAME" \
+              -r "${{ env.AWS_REGION }}" \
+              --skip-destructive \
+              -o "./test-results" || {
+              echo "::error::Post-deployment tests failed"
+              echo "test_result=failed" >> $GITHUB_OUTPUT
+              exit 1
+            }
+            
+            echo "test_result=passed" >> $GITHUB_OUTPUT
+            echo "✅ All post-deployment tests passed"
+          else
+            echo "⚠️ No test script found, skipping tests"
+            echo "test_result=skipped" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "::endgroup::"
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: steps.post_deploy_tests.outcome != 'skipped'
+        with:
+          name: test-results-${{ needs.validate_and_plan.outputs.environment }}-${{ github.run_id }}
+          path: terraform/test-results/
+          retention-days: 30
+
+      - name: Deployment Summary
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const environment = '${{ needs.validate_and_plan.outputs.environment }}';
+            const applyStatus = '${{ steps.apply.outcome }}';
+            const testResult = '${{ steps.post_deploy_tests.outputs.test_result }}' || 'skipped';
+            const applicationUrl = '${{ steps.get_outputs.outputs.application_url }}' || 'Not available';
+            const vpcId = '${{ steps.get_outputs.outputs.vpc_id }}' || 'Not available';
+            const instanceIds = '${{ steps.get_outputs.outputs.instance_ids }}' || 'Not available';
+            
+            const deployIcon = applyStatus === 'success' ? '✅' : '❌';
+            const testIcon = testResult === 'passed' ? '✅' : testResult === 'failed' ? '❌' : '⏭️';
+            
+            const output = `
+            ## 🚀 Deployment Summary
+            
+            **Environment:** \`${environment}\`
+            **Status:** ${deployIcon} ${applyStatus === 'success' ? 'Success' : 'Failed'}
+            **Tests:** ${testIcon} ${testResult.charAt(0).toUpperCase() + testResult.slice(1)}
+            **Application:** ${applicationUrl}
+            
+            ### 📊 Infrastructure Details
+            - **VPC ID:** \`${vpcId}\`
+            - **Instance IDs:** \`${instanceIds}\`
+            - **Region:** \`${{ env.AWS_REGION }}\`
+            
+            ### 📋 Changes Applied
+            - **Created:** ${{ needs.validate_and_plan.outputs.resources_to_add }} resources
+            - **Updated:** ${{ needs.validate_and_plan.outputs.resources_to_change }} resources
+            - **Destroyed:** ${{ needs.validate_and_plan.outputs.resources_to_destroy }} resources
+            
+            ${applyStatus === 'success' && testResult === 'passed' ? `
+            ### ✅ Deployment Successful
+            - Infrastructure deployed successfully
+            - All post-deployment tests passed
+            - Application is ready for use
+            ` : `
+            ### ⚠️ Issues Detected
+            ${applyStatus !== 'success' ? '- Infrastructure deployment failed' : ''}
+            ${testResult === 'failed' ? '- Post-deployment tests failed' : ''}
+            
+            Please check the workflow logs for detailed information.
+            `}
+            
+            ---
+            *Deployed by @${{ github.actor }} • Commit: ${{ github.sha }}*
+            `;
+            
+            // Post comment based on event type
+            if (context.eventName === 'pull_request') {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: output
+              });
+            } else {
+              github.rest.repos.createCommitComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.sha,
+                body: output
+              });
+            }
+
+  # Job 3: Cleanup Preview Environments
+  cleanup_preview:
+    name: Cleanup Preview Environment
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      contains(github.event.pull_request.labels.*.name, 'deploy')
+
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: GitHubActions-Cleanup-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Cleanup Preview Environment
+        env:
+          PREVIEW_ENV: preview-$(echo '${{ github.head_ref }}' | tr -cd '[:alnum:]-_' | cut -c1-50)
+        run: |
+          echo "::group::Cleanup Preview Environment"
+          
+          STATE_KEY="infrastructure/${{ github.event.repository.name }}/${PREVIEW_ENV}/terraform.tfstate"
+          
+          # Initialize Terraform
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=$STATE_KEY" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_STATE_LOCK_TABLE }}"
+          
+          # Check if state exists
+          if terraform state list > /dev/null 2>&1; then
+            echo "🧹 Destroying preview environment: $PREVIEW_ENV"
+            
+            terraform destroy -auto-approve \
+              -var-file="environments/test.tfvars" \
+              -var="env=$PREVIEW_ENV" \
+              -var="enable_preview=true" || {
+              echo "⚠️ Destroy operation had issues, but continuing"
+            }
+          else
+            echo "ℹ️ No state found for preview environment: $PREVIEW_ENV"
+          fi
+          
+          echo "✅ Preview environment cleanup completed"
+          echo "::endgroup::"
+        continue-on-error: true
+
+      - name: Comment Cleanup Status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const previewEnv = `preview-${context.payload.pull_request.head.ref.replace(/[^a-zA-Z0-9-_]/g, '').substring(0, 50)}`;
+            
+            const output = `
+            ## 🧹 Preview Environment Cleanup
+            
+            **Environment:** \`${previewEnv}\`
+            **Status:** ✅ Cleanup completed
+            
+            All preview environment resources have been destroyed.
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });

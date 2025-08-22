@@ -28,6 +28,16 @@ name: Infrastructure CI/CD Pipeline
           - test
           - staging
           - prod
+      force_recreate:
+        description: Force recreation of resources (use with caution)
+        required: false
+        default: false
+        type: boolean
+      skip_tests:
+        description: Skip post-deployment tests
+        required: false
+        default: false
+        type: boolean
 
 # Required permissions for OIDC authentication
 permissions:
@@ -42,6 +52,10 @@ env:
   TF_VERSION: 1.6.0
   AWS_REGION: us-east-1
   TF_VAR_aws_region: us-east-1
+  # Production best practices
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+  TF_CLI_ARGS: "-no-color"
 
 jobs:
   # Job 1: Pull Request Validation Pipeline
