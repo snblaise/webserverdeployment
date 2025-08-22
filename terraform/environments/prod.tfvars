@@ -1,71 +1,34 @@
-# ========================================
 # Production Environment Configuration
-# ========================================
-
-# Project Configuration
+env = "prod"
 project_name = "secure-cicd-pipeline"
-env          = "prod"
-
-# AWS Configuration
-aws_region = "us-east-1"
 
 # Network Configuration
-cidr_block         = "10.2.0.0/16"  # Dedicated CIDR for production
-az_count           = 2
-allowed_http_cidrs = [
-  "0.0.0.0/0"  # Public access for production web application
-]
+vpc_cidr = "10.2.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
 
-# Compute Configuration - Production sizing
-instance_type  = "t3.small"  # Adequate for production workload
-instance_count = 2           # Multi-instance for high availability
+# Compute Configuration (full production)
+instance_type = "t3.small"
+instance_count = 3
+enable_detailed_monitoring = true
 
-# Security Configuration
-kms_key_id                 = null  # Use default AWS managed key (consider custom KMS key)
-enable_detailed_monitoring = true  # Full monitoring for production
-
-# Environment-specific Configuration
-enable_preview        = false
-backup_retention_days = 30  # Extended retention for production
+# Security Configuration - RESTRICT ACCESS
+# allowed_http_cidrs = []  # Define specific IP ranges for production
 
 # Monitoring Configuration
-sns_email_endpoints = [
-  "devops-prod@example.com",
-  "oncall@example.com",
-  "management@example.com"
-]
-cloudwatch_log_retention_days = 90  # Extended retention for compliance
+enable_enhanced_monitoring = true
+log_retention_days = 30
 
-# WAF Configuration - Strict security for production
-waf_rate_limit = 2000  # Standard rate limiting
+# Cost Control
+enable_cost_monitoring = true
+budget_limit = 150
 
-# Patch Management Configuration
-patch_schedule = "cron(0 2 ? * SUN *)"  # Sundays at 2 AM UTC
+# Backup Configuration
+backup_retention_days = 30
 
-# Tagging Configuration
-cost_center = "devops"
+# Tags
 additional_tags = {
-  "Owner"           = "DevOps Team"
-  "Application"     = "Secure CI/CD Pipeline"
-  "Environment"     = "prod"
-  "CriticalSystem"  = "true"
-  "Backup"          = "required"
-  "Monitoring"      = "enhanced"
-  "Purpose"         = "production-workload"
-  "ApprovalGate"    = "senior-team-required"
-  "ChangeWindow"    = "business-hours-only"
-  "Compliance"      = "required"
-}# Cost M
-onitoring Configuration - Production Environment
-enable_cost_monitoring            = true
-monthly_budget_limit             = 150  # Higher budget for production
-budget_alert_emails              = [
-  "devops-prod@example.com",
-  "finance@example.com",
-  "management@example.com"
-]
-enable_sns_cost_alerts           = true  # Enable SNS for production alerts
-enable_cloudwatch_billing_alarms = true
-cloudwatch_billing_threshold     = 120  # Alert at $120 for production
-enable_cost_anomaly_detection    = true  # Enable for production monitoring
-cost_anomaly_threshold           = 25   # Higher threshold for production
+  Environment = "production"
+  Purpose = "live-application"
+  CostCenter = "operations"
+  Compliance = "required"
+}
