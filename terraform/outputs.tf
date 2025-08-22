@@ -173,8 +173,9 @@ output "cloudwatch_alarms" {
       aws_cloudwatch_metric_alarm.patch_compliance_failure.alarm_name
     ]
   )
-}# ===
-=====================================
+}
+
+# ========================================
 # Cost Monitoring Outputs
 # ========================================
 

@@ -1,6 +1,6 @@
 # AWS Resources for CI/CD Pipeline
 terraform {
-  required_version = ">= 1.6.0"
+  required_version = ">= 1.5.0"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -22,7 +22,23 @@ variable "aws_region" {
 variable "project_name" {
   description = "Project name"
   type        = string
-  default     = "secure-cicd-pipeline"
+  default     = "webserverdeployment"
+  
+  validation {
+    condition     = can(regex("^[a-z0-9-]+$", var.project_name))
+    error_message = "Project name must contain only lowercase letters, numbers, and hyphens."
+  }
+}
+
+variable "github_repository" {
+  description = "GitHub repository in format 'owner/repo'"
+  type        = string
+  default     = "snblaise/webserverdeployment"
+  
+  validation {
+    condition     = can(regex("^[^/]+/[^/]+$", var.github_repository))
+    error_message = "GitHub repository must be in format 'owner/repo'."
+  }
 }
 
 # S3 bucket for Terraform state
@@ -70,6 +86,14 @@ resource "aws_dynamodb_table" "terraform_state_lock" {
     type = "S"
   }
 
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+
   tags = {
     Name    = "${var.project_name}-terraform-state-lock"
     Purpose = "Terraform state locking"
@@ -84,14 +108,22 @@ resource "aws_iam_openid_connect_provider" "github" {
     "sts.amazonaws.com",
   ]
 
+  # GitHub OIDC thumbprints - update if GitHub changes certificates
+  # Current thumbprints as of 2024 - monitor for updates
   thumbprint_list = [
-    "6938fd4d98bab03faadb97b34396831e3780aea1",
-    "1c58a3a8518e8759bf075b76b750d4f2df264fcd"
+    "6938fd4d98bab03faadb97b34396831e3780aea1", # GitHub Actions OIDC
+    "1c58a3a8518e8759bf075b76b750d4f2df264fcd"  # GitHub backup
   ]
 }
 
 resource "aws_iam_role" "github_actions" {
-  name = "${var.project_name}-github-actions-role"
+  name                 = "${var.project_name}-github-actions-role"
+  description          = "IAM role for GitHub Actions CI/CD pipeline with OIDC authentication"
+  max_session_duration = 3600
+
+  lifecycle {
+    prevent_destroy = true
+  }
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -107,7 +139,7 @@ resource "aws_iam_role" "github_actions" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:*/webserverdeployment:*"
+            "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:*"
           }
         }
       }
@@ -115,46 +147,40 @@ resource "aws_iam_role" "github_actions" {
   })
 }
 
+locals {
+  cicd_permissions = [
+    "ec2:DescribeInstances", "ec2:DescribeInstanceStatus", "ec2:DescribeSecurityGroups",
+    "ec2:DescribeSubnets", "ec2:DescribeVpcs", "ec2:RunInstances", "ec2:TerminateInstances", "ec2:CreateTags",
+    "elasticloadbalancing:*", "wafv2:*", "cloudwatch:*", "sns:*", "ssm:*",
+    "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:PassRole", "iam:*RolePolicy", "iam:*InstanceProfile",
+    "budgets:*", "ce:GetCostAndUsage", "ce:GetUsageReport"
+  ]
+}
+
 resource "aws_iam_role_policy" "github_actions" {
   name = "${var.project_name}-github-actions-policy"
   role = aws_iam_role.github_actions.id
+
+  lifecycle {
+    prevent_destroy = true
+  }
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = [
-          "ec2:*",
-          "elasticloadbalancing:*",
-          "wafv2:*",
-          "cloudwatch:*",
-          "sns:*",
-          "ssm:*",
-          "iam:*",
-          "s3:*",
-          "dynamodb:*",
-          "budgets:*",
-          "ce:*"
-        ]
+        Effect   = "Allow"
+        Action   = local.cicd_permissions
         Resource = "*"
       },
       {
         Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject"
-        ]
+        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
         Resource = "${aws_s3_bucket.terraform_state.arn}/*"
       },
       {
         Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:PutItem",
-          "dynamodb:DeleteItem"
-        ]
+        Action = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem"]
         Resource = aws_dynamodb_table.terraform_state_lock.arn
       }
     ]

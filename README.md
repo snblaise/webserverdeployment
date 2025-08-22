@@ -42,26 +42,68 @@ curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/
 
 ## 🚀 Quick Start
 
-### 1. Repository Setup
+### 1. Prerequisites Setup
+
+**⚠️ Critical:** Complete AWS infrastructure setup before using the pipeline. See [SETUP.md](SETUP.md) for detailed instructions.
+
+**Deploy AWS OIDC Infrastructure First:**
+
+```bash
+# Navigate to AWS setup directory
+cd aws-setup
+
+# Initialize and apply Terraform
+terraform init
+terraform plan
+terraform apply -auto-approve
+
+# Note the output values for GitHub secrets
+terraform output
+```
+
+**Configure GitHub Secrets:**
+
+```bash
+# Install GitHub CLI if not available
+brew install gh
+
+# Authenticate with GitHub
+gh auth login --web
+
+# Set required secrets (use actual values from terraform output)
+gh secret set AWS_ROLE_TO_ASSUME --body "arn:aws:iam::ACCOUNT:role/webserverdeployment-github-actions-role"
+gh secret set TF_STATE_BUCKET --body "webserverdeployment-terraform-state-SUFFIX"
+gh secret set TF_STATE_LOCK_TABLE --body "webserverdeployment-terraform-state-lock"
+
+# Optional: Add Infracost API key
+gh secret set INFRACOST_API_KEY --body "ico-xxxxxxxxxxxxxxxx"
+```
+
+### 2. Repository Setup
 
 1. **Clone the repository:**
    ```bash
    git clone <repository-url>
-   cd secure-cicd-pipeline
+   cd webserverdeployment
    ```
 
-2. **Configure GitHub Secrets:**
-   - `AWS_ROLE_TO_ASSUME`: IAM role ARN for OIDC authentication
-   - `TF_STATE_BUCKET`: S3 bucket name for Terraform state
-   - `TF_STATE_LOCK_TABLE`: DynamoDB table for state locking
-   - `INFRACOST_API_KEY`: Infracost API key (optional, for cost analysis)
+2. **Verify GitHub Secrets:**
+   ```bash
+   gh secret list
+   ```
 
-### 2. Local Development Setup
+### 3. Local Development Setup
+
+**⚠️ Important:** Complete Prerequisites Setup first before proceeding.
 
 1. **Initialize Terraform:**
    ```bash
    cd terraform
-   terraform init -backend-config=backend.hcl
+   terraform init \
+     -backend-config="bucket=<TF_STATE_BUCKET>" \
+     -backend-config="key=infrastructure/local/terraform.tfstate" \
+     -backend-config="region=us-east-1" \
+     -backend-config="dynamodb_table=<TF_STATE_LOCK_TABLE>"
    ```
 
 2. **Configure environment variables:**
@@ -81,7 +123,7 @@ curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/
    ./scripts/security-scan.sh
    ```
 
-### 3. Environment-Specific Deployment
+### 4. Environment-Specific Deployment
 
 Choose your deployment environment:
 

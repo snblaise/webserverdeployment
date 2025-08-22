@@ -63,6 +63,14 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      - name: Check Required Secrets
+        run: |
+          if [ -z "${{ secrets.AWS_ROLE_TO_ASSUME }}" ]; then
+            echo "::error::AWS_ROLE_TO_ASSUME secret not configured"
+            echo "Please set up AWS OIDC infrastructure first using aws-setup/create-cicd-resources.tf"
+            exit 1
+          fi
+
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -225,7 +233,7 @@ jobs:
           echo "Generating Terraform plan for validation and analysis..."
           terraform plan -out=main_plan.tfplan \
             -var="env=preview-${SAFE_BRANCH}" \
-            -var="project_name=${SAFE_REPO}" \
+            -var="project_name=webserverdeployment" \
             -var="enable_preview=true" \
             -detailed-exitcode || {
             PLAN_EXIT_CODE=$?
@@ -1005,7 +1013,7 @@ jobs:
         run: |
           terraform destroy -auto-approve \
             -var="env=preview-${{ github.head_ref }}" \
-            -var="project_name=${{ github.event.repository.name }}" \
+            -var="project_name=webserverdeployment" \
             -var="enable_preview=true"
         continue-on-error: true
 
@@ -1450,7 +1458,7 @@ jobs:
           echo "Checking CloudWatch alarms..."
           
           ALARM_COUNT=$(aws cloudwatch describe-alarms \
-            --alarm-name-prefix "secure-cicd-pipeline-staging" \
+            --alarm-name-prefix "webserverdeployment-staging" \
             --query 'MetricAlarms | length(@)' \
             --output text 2>/dev/null || echo "0")
           
@@ -1464,7 +1472,7 @@ jobs:
           echo "Checking SNS topic..."
           
           SNS_TOPIC=$(aws sns list-topics \
-            --query 'Topics[?contains(TopicArn, `secure-cicd-pipeline-staging`)].TopicArn' \
+            --query 'Topics[?contains(TopicArn, `webserverdeployment-staging`)].TopicArn' \
             --output text 2>/dev/null || echo "")
           
           if [ -n "$SNS_TOPIC" ]; then
@@ -1797,7 +1805,7 @@ jobs:
           
           # Verify CloudWatch alarms are active
           ALARM_COUNT=$(aws cloudwatch describe-alarms \
-            --alarm-name-prefix "secure-cicd-pipeline-prod" \
+            --alarm-name-prefix "webserverdeployment-prod" \
             --state-value ALARM \
             --query 'MetricAlarms | length(@)' \
             --output text 2>/dev/null || echo "0")

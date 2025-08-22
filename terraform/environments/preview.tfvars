@@ -3,7 +3,7 @@
 # ========================================
 
 # Project Configuration
-project_name = "secure-cicd-pipeline"
+project_name = "webserverdeployment"
 env          = "preview"
 
 # AWS Configuration
@@ -44,7 +44,7 @@ patch_schedule = "cron(0 4 ? * SUN *)"  # Sundays at 4 AM UTC
 cost_center = "devops"
 additional_tags = {
   "Owner"           = "DevOps Team"
-  "Application"     = "Secure CI/CD Pipeline"
+  "Application"     = "Web Server Deployment"
   "Environment"     = "preview"
   "Temporary"       = "true"
   "AutoCleanup"     = "true"

@@ -1,6 +1,6 @@
 # Staging Environment Configuration
 env = "staging"
-project_name = "secure-cicd-pipeline"
+project_name = "webserverdeployment"
 
 # Network Configuration
 vpc_cidr = "10.1.0.0/16"

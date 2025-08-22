@@ -1,6 +1,6 @@
 # Production Environment Configuration
 env = "prod"
-project_name = "secure-cicd-pipeline"
+project_name = "webserverdeployment"
 
 # Network Configuration
 vpc_cidr = "10.2.0.0/16"
