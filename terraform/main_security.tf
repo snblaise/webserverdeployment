@@ -230,10 +230,6 @@ resource "aws_wafv2_web_acl" "main" {
     name     = "RateLimitRule"
     priority = 1
 
-    override_action {
-      none {}
-    }
-
     statement {
       rate_based_statement {
         limit              = var.waf_rate_limit

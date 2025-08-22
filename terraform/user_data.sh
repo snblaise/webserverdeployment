@@ -4,14 +4,14 @@
 dnf update -y
 
 # Install required packages
-dnf install -y httpd amazon-cloudwatch-agent
+dnf install -y httpd php amazon-cloudwatch-agent
 
 # Start and enable services
 systemctl start httpd
 systemctl enable httpd
 
-# Create a simple index page
-cat > /var/www/html/index.html << EOF
+# Create a dynamic PHP page
+cat > /var/www/html/index.php << 'EOF'
 <!DOCTYPE html>
 <html>
 <head>
@@ -26,11 +26,25 @@ cat > /var/www/html/index.html << EOF
     <h1 class="header">Welcome to ${project_name}</h1>
     <div class="info">
         <h2>Environment: ${environment}</h2>
-        <p>Instance ID: $(curl -s http://169.254.169.254/latest/meta-data/instance-id)</p>
-        <p>Availability Zone: $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)</p>
-        <p>Instance Type: $(curl -s http://169.254.169.254/latest/meta-data/instance-type)</p>
-        <p>Server Time: $(date)</p>
+        <p>Instance ID: <?php echo shell_exec('curl -s http://169.254.169.254/latest/meta-data/instance-id'); ?></p>
+        <p>Availability Zone: <?php echo shell_exec('curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone'); ?></p>
+        <p>Instance Type: <?php echo shell_exec('curl -s http://169.254.169.254/latest/meta-data/instance-type'); ?></p>
+        <p>Server Time: <?php echo date('D M j H:i:s T Y'); ?></p>
     </div>
+</body>
+</html>
+EOF
+
+# Create index.html that redirects to PHP
+cat > /var/www/html/index.html << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="refresh" content="0; url=index.php">
+    <title>Redirecting...</title>
+</head>
+<body>
+    <p>Redirecting to dynamic page...</p>
 </body>
 </html>
 EOF
