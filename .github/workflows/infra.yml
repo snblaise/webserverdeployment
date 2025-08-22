@@ -1087,6 +1087,15 @@ jobs:
         run: |
           terraform workspace select test || terraform workspace new test
 
+      - name: Import Existing Resources
+        id: import_resources
+        run: |
+          echo "::group::Import Existing Resources"
+          chmod +x scripts/import-existing-resources.sh
+          ./scripts/import-existing-resources.sh
+          echo "::endgroup::"
+        continue-on-error: true
+
       - name: Terraform Plan
         id: plan
         run: |
