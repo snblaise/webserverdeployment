@@ -205,7 +205,7 @@ variable "monthly_budget_limit" {
 variable "budget_alert_emails" {
   description = "List of email addresses to receive budget alerts"
   type        = list(string)
-  default     = ["admin@example.com"]
+  default     = ["shublaisengwa@gmail.com"]
   
   validation {
     condition = alltrue([
