@@ -284,3 +284,34 @@ variable "budget_limit" {
   type        = number
   default     = 100
 }
+
+# Conditional Resource Creation
+variable "create_alb" {
+  description = "Create Application Load Balancer"
+  type        = bool
+  default     = true
+}
+
+variable "create_waf" {
+  description = "Create WAF Web ACL"
+  type        = bool
+  default     = true
+}
+
+variable "create_patch_baseline" {
+  description = "Create SSM Patch Baseline and Patch Group"
+  type        = bool
+  default     = true
+}
+
+variable "create_vpc" {
+  description = "Create VPC and networking resources"
+  type        = bool
+  default     = true
+}
+
+variable "create_instances" {
+  description = "Create EC2 instances"
+  type        = bool
+  default     = true
+}

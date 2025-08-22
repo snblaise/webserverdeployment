@@ -218,6 +218,8 @@ resource "aws_kms_alias" "waf_logs" {
 
 # WAF Web ACL for Application Load Balancer
 resource "aws_wafv2_web_acl" "main" {
+  count = var.create_waf ? 1 : 0
+  
   name  = "${var.project_name}-${var.env}-web-acl"
   scope = "REGIONAL"
 
@@ -295,6 +297,8 @@ resource "aws_cloudwatch_log_group" "waf_log_group" {
 
 # WAF Logging Configuration
 resource "aws_wafv2_web_acl_logging_configuration" "main" {
-  resource_arn            = aws_wafv2_web_acl.main.arn
+  count = var.create_waf ? 1 : 0
+  
+  resource_arn            = aws_wafv2_web_acl.main[0].arn
   log_destination_configs = [aws_cloudwatch_log_group.waf_log_group.arn]
 }

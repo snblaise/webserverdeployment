@@ -24,11 +24,13 @@ data "aws_ami" "amazon_linux" {
 
 # Application Load Balancer
 resource "aws_lb" "main" {
+  count = var.create_alb ? 1 : 0
+  
   name               = "${var.project_name}-${var.env}-alb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
-  subnets            = aws_subnet.public[*].id
+  subnets            = var.create_vpc ? aws_subnet.public[*].id : data.aws_subnets.existing[0].ids
 
   enable_deletion_protection = var.env == "prod" ? true : false
 
@@ -39,10 +41,12 @@ resource "aws_lb" "main" {
 
 # Target Group for EC2 instances
 resource "aws_lb_target_group" "main" {
+  count = var.create_alb ? 1 : 0
+  
   name     = "${var.project_name}-${var.env}-tg"
   port     = 80
   protocol = "HTTP"
-  vpc_id   = aws_vpc.main.id
+  vpc_id   = var.create_vpc ? aws_vpc.main.id : data.aws_vpc.existing[0].id
 
   health_check {
     enabled             = true
@@ -63,13 +67,15 @@ resource "aws_lb_target_group" "main" {
 
 # ALB Listener for HTTP traffic
 resource "aws_lb_listener" "main" {
-  load_balancer_arn = aws_lb.main.arn
+  count = var.create_alb ? 1 : 0
+  
+  load_balancer_arn = aws_lb.main[0].arn
   port              = "80"
   protocol          = "HTTP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.main.arn
+    target_group_arn = aws_lb_target_group.main[0].arn
   }
 
   tags = merge(local.common_tags, {
@@ -79,8 +85,10 @@ resource "aws_lb_listener" "main" {
 
 # Associate WAF Web ACL with ALB
 resource "aws_wafv2_web_acl_association" "main" {
-  resource_arn = aws_lb.main.arn
-  web_acl_arn  = aws_wafv2_web_acl.main.arn
+  count = var.create_alb && var.create_waf ? 1 : 0
+  
+  resource_arn = aws_lb.main[0].arn
+  web_acl_arn  = aws_wafv2_web_acl.main[0].arn
 }
 
 # ========================================
@@ -97,11 +105,11 @@ locals {
 
 # EC2 instances in private subnets
 resource "aws_instance" "main" {
-  count = var.instance_count
+  count = var.create_instances ? var.instance_count : 0
 
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
-  subnet_id              = aws_subnet.private[count.index % var.az_count].id
+  subnet_id              = var.create_vpc ? aws_subnet.private[count.index % var.az_count].id : data.aws_subnets.existing_private[0].ids[count.index % length(data.aws_subnets.existing_private[0].ids)]
   vpc_security_group_ids = [aws_security_group.ec2.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   user_data              = local.user_data
@@ -141,9 +149,9 @@ resource "aws_instance" "main" {
 
 # Attach EC2 instances to target group
 resource "aws_lb_target_group_attachment" "main" {
-  count = var.instance_count
+  count = var.create_alb && var.create_instances ? var.instance_count : 0
 
-  target_group_arn = aws_lb_target_group.main.arn
+  target_group_arn = aws_lb_target_group.main[0].arn
   target_id        = aws_instance.main[count.index].id
   port             = 80
 }

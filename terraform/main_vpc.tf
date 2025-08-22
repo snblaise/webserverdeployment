@@ -9,6 +9,8 @@ data "aws_availability_zones" "available" {
 
 # Main VPC
 resource "aws_vpc" "main" {
+  count = var.create_vpc ? 1 : 0
+  
   cidr_block           = var.cidr_block
   enable_dns_hostnames = true
   enable_dns_support   = true
@@ -20,7 +22,9 @@ resource "aws_vpc" "main" {
 
 # Internet Gateway
 resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
+  count = var.create_vpc ? 1 : 0
+  
+  vpc_id = aws_vpc.main[0].id
 
   tags = merge(local.common_tags, {
     Name = "${var.project_name}-${var.env}-igw"

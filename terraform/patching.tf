@@ -4,6 +4,8 @@
 
 # SSM Patch Baseline for Amazon Linux 2023
 resource "aws_ssm_patch_baseline" "amazon_linux" {
+  count = var.create_patch_baseline ? 1 : 0
+  
   name             = "${var.project_name}-${var.env}-amazon-linux-baseline"
   description      = "Patch baseline for Amazon Linux 2023 systems in ${var.env} environment"
   operating_system = "AMAZON_LINUX_2023"
@@ -53,7 +55,9 @@ resource "aws_ssm_patch_baseline" "amazon_linux" {
 
 # Patch Group association
 resource "aws_ssm_patch_group" "main" {
-  baseline_id = aws_ssm_patch_baseline.amazon_linux.id
+  count = var.create_patch_baseline ? 1 : 0
+  
+  baseline_id = aws_ssm_patch_baseline.amazon_linux[0].id
   patch_group = "${var.project_name}-${var.env}"
 }
 
