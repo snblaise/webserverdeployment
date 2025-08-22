@@ -254,3 +254,33 @@ variable "cost_anomaly_threshold" {
     error_message = "Cost anomaly threshold must be greater than 0."
   }
 }
+
+variable "log_retention_days" {
+  description = "Log retention period in days"
+  type        = number
+  default     = 14
+}
+
+variable "availability_zones" {
+  description = "List of availability zones"
+  type        = list(string)
+  default     = []
+}
+
+variable "vpc_cidr" {
+  description = "VPC CIDR block"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "enable_enhanced_monitoring" {
+  description = "Enable enhanced monitoring"
+  type        = bool
+  default     = false
+}
+
+variable "budget_limit" {
+  description = "Budget limit in USD"
+  type        = number
+  default     = 100
+}

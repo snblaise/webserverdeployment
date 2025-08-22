@@ -19,11 +19,8 @@ resource "aws_budgets_budget" "monthly_cost_budget" {
   time_period_start = formatdate("YYYY-MM-01_00:00", plantimestamp())
 
   cost_filter {
-    dimension {
-      key           = "Service"
-      values        = ["Amazon Elastic Compute Cloud - Compute"]
-      match_options = ["EQUALS"]
-    }
+    name   = "Service"
+    values = ["Amazon Elastic Compute Cloud - Compute"]
   }
 
   # Alert when 80% of budget is reached
