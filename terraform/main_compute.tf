@@ -46,7 +46,7 @@ resource "aws_lb_target_group" "main" {
   name     = "${var.project_name}-${var.env}-tg"
   port     = 80
   protocol = "HTTP"
-  vpc_id   = var.create_vpc ? aws_vpc.main.id : data.aws_vpc.existing[0].id
+  vpc_id   = var.create_vpc ? aws_vpc.main[0].id : data.aws_vpc.existing[0].id
 
   health_check {
     enabled             = true

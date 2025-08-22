@@ -118,7 +118,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx_errors" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    LoadBalancer = aws_lb.main.arn_suffix
+    LoadBalancer = var.create_alb ? aws_lb.main[0].arn_suffix : data.aws_lb.existing[0].arn_suffix
   }
 
   tags = merge(local.common_tags, {
@@ -142,8 +142,8 @@ resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_targets" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    TargetGroup  = aws_lb_target_group.main.arn_suffix
-    LoadBalancer = aws_lb.main.arn_suffix
+    TargetGroup  = var.create_alb ? aws_lb_target_group.main[0].arn_suffix : data.aws_lb_target_group.existing[0].arn_suffix
+    LoadBalancer = var.create_alb ? aws_lb.main[0].arn_suffix : data.aws_lb.existing[0].arn_suffix
   }
 
   tags = merge(local.common_tags, {
@@ -197,7 +197,7 @@ resource "aws_cloudwatch_dashboard" "infrastructure" {
               "AWS/ApplicationELB",
               "RequestCount",
               "LoadBalancer",
-              aws_lb.main.arn_suffix
+              var.create_alb ? aws_lb.main[0].arn_suffix : data.aws_lb.existing[0].arn_suffix
             ],
             [
               ".",
@@ -232,9 +232,9 @@ resource "aws_cloudwatch_dashboard" "infrastructure" {
               "AWS/ApplicationELB",
               "HealthyHostCount",
               "TargetGroup",
-              aws_lb_target_group.main.arn_suffix,
+              var.create_alb ? aws_lb_target_group.main[0].arn_suffix : data.aws_lb_target_group.existing[0].arn_suffix,
               "LoadBalancer",
-              aws_lb.main.arn_suffix
+              var.create_alb ? aws_lb.main[0].arn_suffix : data.aws_lb.existing[0].arn_suffix
             ],
             [
               ".",

@@ -121,7 +121,7 @@ resource "aws_security_group" "alb" {
 # Security group for EC2 instances
 resource "aws_security_group" "ec2" {
   name_prefix = "${var.project_name}-${var.env}-ec2-"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = var.create_vpc ? aws_vpc.main[0].id : data.aws_vpc.existing[0].id
 
   # HTTP access from ALB security group
   ingress {
